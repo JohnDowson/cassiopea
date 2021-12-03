@@ -29,6 +29,12 @@ impl Rect {
         let (x2, y2) = self.bottom_right;
         ((x1 + x2) / 2, (y1 + y2) / 2)
     }
+    pub fn coords(&self) -> (i32, i32, i32, i32) {
+        let (x1, y1) = self.top_left;
+        let (x2, y2) = self.bottom_right;
+
+        (x1, y1, x2, y2)
+    }
 }
 
 impl BitAnd<&Rect> for &Rect {
@@ -166,6 +172,11 @@ impl Map {
         } else {
             self.passable[self.coords_to_idx(x, y)]
         }
+    }
+
+    pub fn is_visible(&self, x: i32, y: i32) -> bool {
+        let idx = self.coords_to_idx(x, y);
+        self.visible[idx]
     }
 }
 

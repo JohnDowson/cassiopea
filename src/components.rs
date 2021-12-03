@@ -77,3 +77,11 @@ impl TakeDamage {
         store.insert(target, dmg).expect("Unable to insert damage");
     }
 }
+
+#[derive(Component, Debug)]
+pub struct Item;
+
+#[derive(Component, Debug)]
+pub enum Effect {
+    Heal(i32),
+}

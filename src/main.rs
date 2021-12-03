@@ -2,9 +2,9 @@ use cassiopea::{
     components::*,
     gui::GameLog,
     map::Map,
+    spawner::{player, spawn_room},
     state::{RunState, State},
 };
-use rltk::{to_cp437, RGB};
 use specs::prelude::*;
 
 fn main() -> rltk::BError {
@@ -25,76 +25,21 @@ fn main() -> rltk::BError {
     gs.ecs.register::<Stats>();
     gs.ecs.register::<MeleeAttack>();
     gs.ecs.register::<TakeDamage>();
+    gs.ecs.register::<Item>();
+    gs.ecs.register::<Effect>();
 
     let map = Map::new(80, 43);
 
     let mut rng = rltk::RandomNumberGenerator::new();
     let (x, y) = rng.random_slice_entry(&map.rooms).unwrap().center();
-
-    gs.ecs
-        .create_entity()
-        .with(Position { x, y })
-        .with(Renderable {
-            glyph: rltk::to_cp437('@'),
-            fg: RGB::named(rltk::YELLOW),
-            bg: RGB::named(rltk::BLACK),
-        })
-        .with(Control)
-        .with(Viewshed {
-            visible_tiles: Default::default(),
-            range: 8,
-            dirty: true,
-        })
-        .with(Blocker)
-        .with(Stats {
-            base_power: 10,
-            base_health: 20,
-            hp: 20,
-            defense: 3,
-        })
-        .with(Name {
-            name: "Player".to_string(),
-        })
-        .build();
-
-    for r in &map.rooms {
-        let (e_x, e_y) = r.center();
-        if e_x == x && e_y == y {
-            continue;
-        }
-        let (glyph, name) = rng
-            .random_slice_entry(&[('&', "Snake"), ('$', "Skeleton")])
-            .unwrap();
-        gs.ecs
-            .create_entity()
-            .with(Position { x: e_x, y: e_y })
-            .with(Renderable {
-                glyph: to_cp437(*glyph),
-                fg: RGB::named(rltk::RED),
-                bg: RGB::named(rltk::BLACK),
-            })
-            .with(Viewshed {
-                visible_tiles: Default::default(),
-                range: 8,
-                dirty: true,
-            })
-            .with(Enemy)
-            .with(Name {
-                name: name.to_string(),
-            })
-            .with(Blocker)
-            .with(Stats {
-                base_power: 5,
-                base_health: 5,
-                hp: 5,
-                defense: 5,
-            })
-            .build();
-    }
+    let _player = player(&mut gs.ecs, x, y);
 
     gs.ecs.insert(map);
     gs.ecs.insert(RunState::PreRun);
     gs.ecs.insert(GameLog::default());
+    gs.ecs.insert(rltk::RandomNumberGenerator::seeded(69));
+
+    spawn_room(&mut gs.ecs);
 
     rltk::main_loop(context, gs)
 }
