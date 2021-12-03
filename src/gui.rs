@@ -1,8 +1,8 @@
 use crate::{
-    components::{Control, Name, Position, Stats},
+    components::{Control, InInventory, Name, Position, Stats},
     map::Map,
 };
-use rltk::{Point, Rltk, RGB};
+use rltk::{Point, Rltk, VirtualKeyCode, RGB};
 use specs::prelude::*;
 
 pub struct GameLog {
@@ -58,7 +58,7 @@ pub fn draw_ui(ecs: &World, ctx: &mut Rltk) {
     }
 
     for (_, stats) in (&player, &stats).join() {
-        let health = format!("{}/{}", stats.hp, stats.base_health);
+        let health = format!("{}/{}", stats.hp, stats.base_hp);
 
         ctx.print(1, 43, &health);
         ctx.draw_bar_vertical(
@@ -66,7 +66,7 @@ pub fn draw_ui(ecs: &World, ctx: &mut Rltk) {
             44,
             5,
             stats.hp,
-            stats.base_health,
+            stats.base_hp,
             RGB::named(rltk::RED),
             RGB::named(rltk::BLACK),
         )
@@ -169,5 +169,95 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
                 &"<-".to_string(),
             );
         }
+    }
+}
+
+pub enum ItemMenuResult {
+    Cancel,
+    NoResponse,
+    Selected(Entity),
+}
+
+pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
+    let player_entity = ecs.fetch::<Entity>();
+    let names = ecs.read_storage::<Name>();
+    let inventory = ecs.write_storage::<InInventory>();
+
+    let inventory = (&inventory, &names)
+        .join()
+        .filter_map(|(inv, name)| {
+            if inv.owner == *player_entity {
+                Some((inv.item, name.name.clone()))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    let count = inventory.len();
+
+    let mut y = (25 - (count / 2)) as i32;
+    ctx.draw_box(
+        15,
+        y - 2,
+        31,
+        (count + 3) as i32,
+        RGB::named(rltk::WHITE),
+        RGB::named(rltk::BLACK),
+    );
+    ctx.print_color(
+        18,
+        y - 2,
+        RGB::named(rltk::YELLOW),
+        RGB::named(rltk::BLACK),
+        "Inventory",
+    );
+    ctx.print_color(
+        18,
+        y + count as i32 + 1,
+        RGB::named(rltk::YELLOW),
+        RGB::named(rltk::BLACK),
+        "ESCAPE to cancel",
+    );
+
+    for (j, (_, name)) in inventory.iter().enumerate() {
+        ctx.set(
+            17,
+            y,
+            RGB::named(rltk::WHITE),
+            RGB::named(rltk::BLACK),
+            rltk::to_cp437('('),
+        );
+        ctx.set(
+            18,
+            y,
+            RGB::named(rltk::YELLOW),
+            RGB::named(rltk::BLACK),
+            97 + j as rltk::FontCharType,
+        );
+        ctx.set(
+            19,
+            y,
+            RGB::named(rltk::WHITE),
+            RGB::named(rltk::BLACK),
+            rltk::to_cp437(')'),
+        );
+
+        ctx.print(21, y, name);
+        y += 1;
+    }
+
+    match ctx.key {
+        None => ItemMenuResult::NoResponse,
+        Some(key) => match key {
+            VirtualKeyCode::Escape => ItemMenuResult::Cancel,
+            _ => {
+                let selection = rltk::letter_to_option(key);
+                if selection > -1 && selection < count as i32 {
+                    ItemMenuResult::Selected(inventory[selection as usize].0)
+                } else {
+                    ItemMenuResult::NoResponse
+                }
+            }
+        },
     }
 }

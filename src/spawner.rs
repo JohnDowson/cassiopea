@@ -21,7 +21,7 @@ pub fn player(ecs: &mut World, x: i32, y: i32) -> Entity {
         .with(Blocker)
         .with(Stats {
             base_power: 10,
-            base_health: 20,
+            base_hp: 20,
             hp: 20,
             defense: 3,
         })
@@ -55,7 +55,7 @@ pub fn random_enemy(ecs: &mut World, x: i32, y: i32) {
         .with(Blocker)
         .with(Stats {
             base_power: 5,
-            base_health: 5,
+            base_hp: 5,
             hp: 5,
             defense: 5,
         })

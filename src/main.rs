@@ -27,13 +27,17 @@ fn main() -> rltk::BError {
     gs.ecs.register::<TakeDamage>();
     gs.ecs.register::<Item>();
     gs.ecs.register::<Effect>();
+    gs.ecs.register::<InInventory>();
+    gs.ecs.register::<WantsToPickUp>();
+    gs.ecs.register::<WantsToUseItem>();
 
     let map = Map::new(80, 43);
 
     let mut rng = rltk::RandomNumberGenerator::new();
     let (x, y) = rng.random_slice_entry(&map.rooms).unwrap().center();
-    let _player = player(&mut gs.ecs, x, y);
+    let player = player(&mut gs.ecs, x, y);
 
+    gs.ecs.insert(player);
     gs.ecs.insert(map);
     gs.ecs.insert(RunState::PreRun);
     gs.ecs.insert(GameLog::default());

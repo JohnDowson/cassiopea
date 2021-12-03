@@ -1,17 +1,18 @@
 use crate::{
     components::*,
-    gui::{draw_ui, GameLog},
+    gui::{draw_ui, show_inventory, GameLog},
     map::{Map, Tile},
+    player::player_input,
     systems::{
         ai::EnemyAI,
+        inventory_system::{ItemCollectionSystem, ItemConsumptionSystem},
         map_system::MapSystem,
         melee_combat::{DamageSystem, MeleeCombatSystem},
         visability::VisibilitySystem,
     },
 };
-use rltk::{console, GameState, Rltk, VirtualKeyCode, RGB};
+use rltk::{GameState, Rltk, RGB};
 use specs::prelude::*;
-use std::cmp::{max, min};
 
 pub struct State {
     pub ecs: World,
@@ -23,6 +24,7 @@ pub enum RunState {
     AwaitingInput,
     PlayerTurn,
     NPCTurn,
+    ShowInventory,
 }
 
 impl State {
@@ -37,7 +39,11 @@ impl State {
         melee_sys.run_now(&self.ecs);
         let mut damage_sys = DamageSystem;
         damage_sys.run_now(&self.ecs);
-        self.ecs.maintain()
+        let mut item_collection = ItemCollectionSystem;
+        item_collection.run_now(&self.ecs);
+        let mut item_consumption = ItemConsumptionSystem;
+        item_consumption.run_now(&self.ecs);
+        self.ecs.maintain();
     }
 
     fn delete_dead(&mut self) {
@@ -69,61 +75,7 @@ impl State {
         self.ecs
             .delete_entities(&dead)
             .expect("Unable to delete dead");
-    }
-
-    fn player_input(&mut self, ctx: &mut Rltk) -> RunState {
-        use VirtualKeyCode::*;
-        match ctx.key {
-            None => return RunState::AwaitingInput,
-            Some(key) => match key {
-                A => self.try_move_player(-1, 0),
-                D => self.try_move_player(1, 0),
-                W => self.try_move_player(0, -1),
-                S => self.try_move_player(0, 1),
-                Q => self.try_move_player(-1, -1),
-                E => self.try_move_player(1, -1),
-                Z => self.try_move_player(-1, 1),
-                X => self.try_move_player(1, 1),
-                _ => return RunState::AwaitingInput,
-            },
-        }
-        RunState::NPCTurn
-    }
-
-    fn try_move_player(&mut self, delta_x: i32, delta_y: i32) {
-        let mut positions = self.ecs.write_storage::<Position>();
-        let mut players = self.ecs.write_storage::<Control>();
-        let mut viewsheds = self.ecs.write_storage::<Viewshed>();
-        let stats = self.ecs.read_storage::<Stats>();
-        let mut melee = self.ecs.write_storage::<MeleeAttack>();
-        let entities = self.ecs.entities();
-        let map = self.ecs.fetch::<Map>();
-
-        for (entity, _, pos, vis) in
-            (&entities, &mut players, &mut positions, &mut viewsheds).join()
-        {
-            let x = min(79, max(0, pos.x + delta_x));
-            let y = min(49, max(0, pos.y + delta_y));
-            for maybe_target in map.tile_content[map.coords_to_idx(x, y)].iter() {
-                if let Some(_t) = stats.get(*maybe_target) {
-                    melee
-                        .insert(
-                            entity,
-                            MeleeAttack {
-                                target: *maybe_target,
-                            },
-                        )
-                        .expect("Can't insert Melee");
-                    console::log("Player attacks");
-                    return;
-                }
-            }
-            if map.passable[map.coords_to_idx(x, y)] {
-                pos.x = x;
-                pos.y = y;
-            }
-            vis.dirty = true;
-        }
+        self.ecs.maintain();
     }
 
     fn draw_map(&mut self, ctx: &mut Rltk) {
@@ -161,14 +113,14 @@ impl State {
 impl GameState for State {
     fn tick(&mut self, ctx: &mut Rltk) {
         ctx.cls();
-
+        self.draw_map(ctx);
         let mut new_run_state = { *self.ecs.fetch::<RunState>() };
         new_run_state = match new_run_state {
             RunState::PreRun => {
                 self.run_systems();
                 RunState::AwaitingInput
             }
-            RunState::AwaitingInput => self.player_input(ctx),
+            RunState::AwaitingInput => player_input(&mut self.ecs, ctx),
             RunState::PlayerTurn => {
                 self.run_systems();
                 RunState::NPCTurn
@@ -177,15 +129,26 @@ impl GameState for State {
                 self.run_systems();
                 RunState::AwaitingInput
             }
+            RunState::ShowInventory => match show_inventory(&mut self.ecs, ctx) {
+                crate::gui::ItemMenuResult::Cancel => RunState::AwaitingInput,
+                crate::gui::ItemMenuResult::NoResponse => RunState::ShowInventory,
+                crate::gui::ItemMenuResult::Selected(e) => {
+                    let mut intent = self.ecs.write_storage::<WantsToUseItem>();
+                    intent
+                        .insert(*self.ecs.fetch::<Entity>(), WantsToUseItem { item: e })
+                        .expect("Unable to insert intent");
+
+                    RunState::AwaitingInput
+                }
+            },
         };
+        self.ecs.maintain();
         {
             let mut runwriter = self.ecs.write_resource::<RunState>();
             *runwriter = new_run_state;
         }
 
         self.delete_dead();
-
-        self.draw_map(ctx);
         let map = self.ecs.fetch::<Map>();
 
         let positions = self.ecs.read_storage::<Position>();
@@ -196,6 +159,7 @@ impl GameState for State {
                 ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph)
             }
         }
+
         draw_ui(&self.ecs, ctx);
     }
 }

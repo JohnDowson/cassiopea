@@ -56,7 +56,7 @@ pub struct Blocker;
 #[derive(Component, Debug)]
 pub struct Stats {
     pub base_power: i32,
-    pub base_health: i32,
+    pub base_hp: i32,
     pub hp: i32,
     pub defense: i32,
 }
@@ -80,6 +80,26 @@ impl TakeDamage {
 
 #[derive(Component, Debug)]
 pub struct Item;
+
+#[derive(Component, Debug)]
+pub struct Consumable;
+
+#[derive(Component, Debug)]
+pub struct InInventory {
+    pub owner: Entity,
+    pub item: Entity,
+}
+
+#[derive(Component, Debug)]
+pub struct WantsToPickUp {
+    pub collector: Entity,
+    pub item: Entity,
+}
+
+#[derive(Component, Debug)]
+pub struct WantsToUseItem {
+    pub item: Entity,
+}
 
 #[derive(Component, Debug)]
 pub enum Effect {
