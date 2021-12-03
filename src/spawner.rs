@@ -68,8 +68,8 @@ pub fn spawn_room(ecs: &mut World) {
     {
         let mut rng = ecs.write_resource::<RandomNumberGenerator>();
         let map = ecs.read_resource::<Map>();
-        let num_monsters = rng.roll_dice(1, 4);
-        let num_items = rng.roll_dice(1, 2);
+        let num_monsters = rng.roll_dice(1, 3);
+        let num_items = rng.roll_dice(1, 1);
         for room in &map.rooms {
             for _i in 0..num_monsters {
                 let mut added = false;

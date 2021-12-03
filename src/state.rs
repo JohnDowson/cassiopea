@@ -142,7 +142,6 @@ impl GameState for State {
                 }
             },
         };
-        self.ecs.maintain();
         {
             let mut runwriter = self.ecs.write_resource::<RunState>();
             *runwriter = new_run_state;
@@ -159,7 +158,6 @@ impl GameState for State {
                 ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph)
             }
         }
-
         draw_ui(&self.ecs, ctx);
     }
 }
