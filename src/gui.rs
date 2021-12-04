@@ -276,7 +276,12 @@ pub enum TargetingResult {
     NoResponse,
 }
 
-pub fn show_targeting(ecs: &mut World, ctx: &mut Rltk, range: i32) -> TargetingResult {
+pub fn show_targeting(
+    ecs: &mut World,
+    ctx: &mut Rltk,
+    range: i32,
+    radius: Option<i32>,
+) -> TargetingResult {
     let player = ecs.fetch::<Player>();
     let viewsheds = ecs.read_storage::<Viewshed>();
 
@@ -303,15 +308,21 @@ pub fn show_targeting(ecs: &mut World, ctx: &mut Rltk, range: i32) -> TargetingR
     }
 
     let mouse_pos = ctx.mouse_pos();
-    let mut valid_target = false;
-    for p in available {
-        if p.x == mouse_pos.0 && p.y == mouse_pos.1 {
-            valid_target = true;
-        }
-    }
+    let valid_target = available
+        .into_iter()
+        .any(|p| p.x == mouse_pos.0 && p.y == mouse_pos.1);
+
     if valid_target {
         let (x, y) = (mouse_pos.0, mouse_pos.1);
         ctx.set_bg(x, y, RGB::named(rltk::CYAN));
+        if let (Some(radius), Some(visible)) = (radius, viewsheds.get(player.entity)) {
+            for p in &visible.visible_tiles {
+                let distance = rltk::DistanceAlg::Pythagoras.distance2d(Point::new(x, y), *p);
+                if distance <= radius as f32 {
+                    ctx.set_bg(p.x, p.y, RGB::named(rltk::ORANGE_RED));
+                }
+            }
+        }
         if ctx.left_click {
             return TargetingResult::Tile(x, y);
         }

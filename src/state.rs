@@ -25,7 +25,11 @@ pub enum RunState {
     PlayerTurn,
     NPCTurn,
     ShowInventory,
-    Targeting { range: i32, item: Entity },
+    Targeting {
+        range: i32,
+        item: Entity,
+        radius: Option<i32>,
+    },
 }
 
 impl State {
@@ -187,12 +191,18 @@ impl GameState for State {
                                 new_state = RunState::Targeting {
                                     range: *range,
                                     item: e,
+                                    radius: None,
                                 };
                             }
-                            Effect::DamageAOE { range, .. } => {
+                            Effect::DamageAOE {
+                                range,
+                                damage: _,
+                                radius,
+                            } => {
                                 new_state = RunState::Targeting {
                                     range: *range,
                                     item: e,
+                                    radius: Some(*radius),
                                 };
                             }
                         },
@@ -202,26 +212,32 @@ impl GameState for State {
                     new_state
                 }
             },
-            RunState::Targeting { range, item } => {
-                match show_targeting(&mut self.ecs, ctx, range) {
-                    TargetingResult::Cancel => RunState::AwaitingInput,
-                    TargetingResult::Tile(x, y) => {
-                        let mut intent = self.ecs.write_storage::<WantsToUseItem>();
-                        intent
-                            .insert(
-                                self.ecs.fetch::<Player>().entity,
-                                WantsToUseItem {
-                                    item,
-                                    target: Target::Tile(x, y),
-                                },
-                            )
-                            .expect("Unable to insert intent");
-                        RunState::PlayerTurn
-                    }
-                    TargetingResult::Entity(_) => todo!(),
-                    TargetingResult::NoResponse => RunState::Targeting { range, item },
+            RunState::Targeting {
+                range,
+                item,
+                radius,
+            } => match show_targeting(&mut self.ecs, ctx, range, radius) {
+                TargetingResult::Cancel => RunState::AwaitingInput,
+                TargetingResult::Tile(x, y) => {
+                    let mut intent = self.ecs.write_storage::<WantsToUseItem>();
+                    intent
+                        .insert(
+                            self.ecs.fetch::<Player>().entity,
+                            WantsToUseItem {
+                                item,
+                                target: Target::Tile(x, y),
+                            },
+                        )
+                        .expect("Unable to insert intent");
+                    RunState::PlayerTurn
                 }
-            }
+                TargetingResult::Entity(_) => todo!(),
+                TargetingResult::NoResponse => RunState::Targeting {
+                    range,
+                    item,
+                    radius,
+                },
+            },
         };
         self.draw_entities(ctx);
         {
