@@ -1,16 +1,18 @@
 use std::collections::HashSet;
 
-use crate::{components::*, map::Map};
-use rltk::{to_cp437, RandomNumberGenerator, RGB};
+use crate::{components::*, map::Map, player::Player};
+use rltk::{to_cp437, Point, RandomNumberGenerator, RGB};
 use specs::prelude::*;
 
-pub fn player(ecs: &mut World, x: i32, y: i32) -> Entity {
-    ecs.create_entity()
+pub fn player(ecs: &mut World, x: i32, y: i32) -> Player {
+    let entity = ecs
+        .create_entity()
         .with(Position { x, y })
         .with(Renderable {
             glyph: rltk::to_cp437('@'),
             fg: RGB::named(rltk::YELLOW),
             bg: RGB::named(rltk::BLACK),
+            render_order: 1,
         })
         .with(Control)
         .with(Viewshed {
@@ -28,7 +30,10 @@ pub fn player(ecs: &mut World, x: i32, y: i32) -> Entity {
         .with(Name {
             name: "Player".to_string(),
         })
-        .build()
+        .with(HasInventory)
+        .build();
+    let position = Point::new(x, y);
+    Player { entity, position }
 }
 
 pub fn random_enemy(ecs: &mut World, x: i32, y: i32) {
@@ -42,6 +47,7 @@ pub fn random_enemy(ecs: &mut World, x: i32, y: i32) {
             glyph: to_cp437(*glyph),
             fg: RGB::named(rltk::RED),
             bg: RGB::named(rltk::BLACK),
+            render_order: 2,
         })
         .with(Viewshed {
             visible_tiles: Default::default(),
@@ -68,8 +74,8 @@ pub fn spawn_room(ecs: &mut World) {
     {
         let mut rng = ecs.write_resource::<RandomNumberGenerator>();
         let map = ecs.read_resource::<Map>();
-        let num_monsters = rng.roll_dice(1, 3);
-        let num_items = rng.roll_dice(1, 1);
+        let num_monsters = rng.roll_dice(1, 2);
+        let num_items = rng.roll_dice(1, 3);
         for room in &map.rooms {
             for _i in 0..num_monsters {
                 let mut added = false;
@@ -101,22 +107,77 @@ pub fn spawn_room(ecs: &mut World) {
         random_enemy(ecs, x as i32, y as i32);
     }
     for &(x, y) in item_spawn_points.iter() {
-        health_potion(ecs, x as i32, y as i32);
+        random_item(ecs, x as i32, y as i32);
     }
 }
 
-fn health_potion(ecs: &mut World, x: i32, y: i32) {
+fn random_item(ecs: &mut World, x: i32, y: i32) {
+    let loot_table = [healing_cell, laser_cell, compact_missile];
+    let roll = {
+        ecs.write_resource::<RandomNumberGenerator>()
+            .random_slice_entry(&loot_table)
+            .unwrap()
+    };
+    roll(ecs, x, y)
+}
+
+fn healing_cell(ecs: &mut World, x: i32, y: i32) {
     ecs.create_entity()
         .with(Position { x, y })
         .with(Renderable {
-            glyph: rltk::to_cp437('¡'),
+            glyph: rltk::to_cp437(';'),
             fg: RGB::named(rltk::MAGENTA),
             bg: RGB::named(rltk::BLACK),
+            render_order: 0,
         })
         .with(Name {
-            name: "Health Potion".to_string(),
+            name: "Healing cell".to_string(),
         })
         .with(Item)
-        .with(Effect::Heal(9))
+        .with(Consumable)
+        .with(Effect::HealSelf(9))
+        .build();
+}
+
+fn laser_cell(ecs: &mut World, x: i32, y: i32) {
+    ecs.create_entity()
+        .with(Position { x, y })
+        .with(Renderable {
+            glyph: rltk::to_cp437('\''),
+            fg: RGB::named(rltk::GREEN),
+            bg: RGB::named(rltk::BLACK),
+            render_order: 0,
+        })
+        .with(Name {
+            name: "Laser Cell".to_string(),
+        })
+        .with(Item)
+        .with(Consumable)
+        .with(Effect::DamageRanged {
+            range: 5,
+            damage: 10,
+        })
+        .build();
+}
+
+fn compact_missile(ecs: &mut World, x: i32, y: i32) {
+    ecs.create_entity()
+        .with(Position { x, y })
+        .with(Renderable {
+            glyph: rltk::to_cp437('>'),
+            fg: RGB::named(rltk::GREEN4),
+            bg: RGB::named(rltk::BLACK),
+            render_order: 0,
+        })
+        .with(Name {
+            name: "Compact Missile".to_string(),
+        })
+        .with(Item)
+        .with(Consumable)
+        .with(Effect::DamageAOE {
+            range: 5,
+            damage: 10,
+            radius: 3,
+        })
         .build();
 }

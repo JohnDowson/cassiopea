@@ -26,8 +26,10 @@ fn main() -> rltk::BError {
     gs.ecs.register::<MeleeAttack>();
     gs.ecs.register::<TakeDamage>();
     gs.ecs.register::<Item>();
+    gs.ecs.register::<Consumable>();
     gs.ecs.register::<Effect>();
     gs.ecs.register::<InInventory>();
+    gs.ecs.register::<HasInventory>();
     gs.ecs.register::<WantsToPickUp>();
     gs.ecs.register::<WantsToUseItem>();
 

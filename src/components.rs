@@ -24,6 +24,7 @@ pub struct Renderable {
     pub glyph: rltk::FontCharType,
     pub fg: RGB,
     pub bg: RGB,
+    pub render_order: u8,
 }
 
 #[derive(Component, Debug)]
@@ -84,11 +85,14 @@ pub struct Item;
 #[derive(Component, Debug)]
 pub struct Consumable;
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone, Copy)]
 pub struct InInventory {
     pub owner: Entity,
     pub item: Entity,
 }
+
+#[derive(Component, Debug)]
+pub struct HasInventory;
 
 #[derive(Component, Debug)]
 pub struct WantsToPickUp {
@@ -96,12 +100,29 @@ pub struct WantsToPickUp {
     pub item: Entity,
 }
 
+#[derive(Debug)]
+pub enum Target {
+    Itself,
+    Other(Entity),
+    Tile(i32, i32),
+}
+
 #[derive(Component, Debug)]
 pub struct WantsToUseItem {
     pub item: Entity,
+    pub target: Target,
 }
 
 #[derive(Component, Debug)]
 pub enum Effect {
-    Heal(i32),
+    HealSelf(i32),
+    DamageRanged {
+        range: i32,
+        damage: i32,
+    },
+    DamageAOE {
+        range: i32,
+        damage: i32,
+        radius: i32,
+    },
 }

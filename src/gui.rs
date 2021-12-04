@@ -1,6 +1,7 @@
 use crate::{
-    components::{Control, InInventory, Name, Position, Stats},
+    components::{Consumable, Control, InInventory, Name, Position, Stats, Viewshed},
     map::Map,
+    player::Player,
 };
 use rltk::{Point, Rltk, VirtualKeyCode, RGB};
 use specs::prelude::*;
@@ -52,7 +53,7 @@ pub fn draw_ui(ecs: &World, ctx: &mut Rltk) {
     let mut y = 44;
     for s in log.entries.iter().rev() {
         if y < 49 {
-            ctx.print(40, y, s);
+            ctx.print(20, y, s);
         }
         y += 1;
     }
@@ -179,14 +180,15 @@ pub enum ItemMenuResult {
 }
 
 pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
-    let player_entity = ecs.fetch::<Entity>();
+    let player = ecs.fetch::<Player>();
     let names = ecs.read_storage::<Name>();
     let inventory = ecs.write_storage::<InInventory>();
+    let consumables = ecs.read_storage::<Consumable>();
 
     let inventory = (&inventory, &names)
         .join()
         .filter_map(|(inv, name)| {
-            if inv.owner == *player_entity {
+            if inv.owner == player.entity {
                 Some((inv.item, name.name.clone()))
             } else {
                 None
@@ -253,11 +255,71 @@ pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
             _ => {
                 let selection = rltk::letter_to_option(key);
                 if selection > -1 && selection < count as i32 {
-                    ItemMenuResult::Selected(inventory[selection as usize].0)
+                    let entity = inventory[selection as usize].0;
+                    if consumables.get(entity).is_some() {
+                        ItemMenuResult::Selected(entity)
+                    } else {
+                        ItemMenuResult::NoResponse
+                    }
                 } else {
                     ItemMenuResult::NoResponse
                 }
             }
         },
     }
+}
+
+pub enum TargetingResult {
+    Cancel,
+    Tile(i32, i32),
+    Entity(Entity),
+    NoResponse,
+}
+
+pub fn show_targeting(ecs: &mut World, ctx: &mut Rltk, range: i32) -> TargetingResult {
+    let player = ecs.fetch::<Player>();
+    let viewsheds = ecs.read_storage::<Viewshed>();
+
+    let prompt = "TARGETING";
+    ctx.print_color(
+        40 - (prompt.len() / 2),
+        42,
+        RGB::named(rltk::RED),
+        RGB::named(rltk::BLACK),
+        prompt,
+    );
+
+    let mut available = Vec::new();
+    if let Some(visible) = viewsheds.get(player.entity) {
+        for p in &visible.visible_tiles {
+            let distance = rltk::DistanceAlg::Pythagoras.distance2d(player.position, *p);
+            if distance <= range as f32 {
+                ctx.set_bg(p.x, p.y, RGB::named(rltk::YELLOWGREEN));
+                available.push(p);
+            }
+        }
+    } else {
+        return TargetingResult::Cancel;
+    }
+
+    let mouse_pos = ctx.mouse_pos();
+    let mut valid_target = false;
+    for p in available {
+        if p.x == mouse_pos.0 && p.y == mouse_pos.1 {
+            valid_target = true;
+        }
+    }
+    if valid_target {
+        let (x, y) = (mouse_pos.0, mouse_pos.1);
+        ctx.set_bg(x, y, RGB::named(rltk::CYAN));
+        if ctx.left_click {
+            return TargetingResult::Tile(x, y);
+        }
+    } else {
+        ctx.set_bg(mouse_pos.0, mouse_pos.1, RGB::named(rltk::RED));
+        if ctx.left_click {
+            return TargetingResult::Cancel;
+        }
+    }
+    TargetingResult::NoResponse
 }
