@@ -3,15 +3,16 @@ use std::{
     ops::{BitAnd, Index, IndexMut},
 };
 
-use rltk::{Algorithm2D, BaseMap, Point};
+use rltk::{Algorithm2D, BaseMap, Point, RGB};
+use serde::{Deserialize, Serialize};
 use specs::Entity;
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub enum Tile {
     Wall,
     Floor,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Rect {
     top_left: (i32, i32),
     bottom_right: (i32, i32),
@@ -49,16 +50,18 @@ impl BitAnd<&Rect> for &Rect {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Map {
     inner: Vec<Tile>,
     pub rooms: Vec<Rect>,
     pub revealed: Vec<bool>,
     pub visible: Vec<bool>,
     pub passable: Vec<bool>,
+    #[serde(skip)]
     pub tile_content: Vec<Vec<Entity>>,
     pub dim_x: i32,
     pub dim_y: i32,
+    pub layer: i32,
 }
 
 impl Map {
@@ -72,7 +75,15 @@ impl Map {
         (x, y)
     }
 
-    pub fn new(dim_x: i32, dim_y: i32) -> Self {
+    pub fn dimensions(&self) -> (i32, i32) {
+        (self.dim_x - 1, self.dim_y - 1)
+    }
+
+    pub fn size(&self) -> usize {
+        (self.dim_x * self.dim_y) as usize
+    }
+
+    pub fn new(dim_x: i32, dim_y: i32, layer: i32) -> Self {
         let mut new = Self {
             inner: vec![Tile::Wall; (dim_x * dim_y) as usize],
             rooms: Vec::new(),
@@ -82,6 +93,7 @@ impl Map {
             tile_content: vec![Vec::new(); (dim_x * dim_y) as usize],
             dim_x,
             dim_y,
+            layer,
         };
 
         for x in 0..dim_x {
@@ -94,7 +106,7 @@ impl Map {
         }
 
         let mut rng = rltk::RandomNumberGenerator::new();
-        for _ in 0..20 {
+        for _ in 0..dim_x / 4 {
             let w = rng.range(5, 20);
             let h = rng.range(3, 10);
             let x = rng.roll_dice(1, dim_x - w - 1);
@@ -177,6 +189,30 @@ impl Map {
     pub fn is_visible(&self, x: i32, y: i32) -> bool {
         let idx = self.coords_to_idx(x, y);
         self.visible[idx]
+    }
+
+    pub fn get_tile_glyph(&self, x: i32, y: i32) -> (RGB, RGB, u16) {
+        let idx = self.coords_to_idx(x, y);
+        match self.inner[idx] {
+            Tile::Floor => (
+                if self.visible[idx] {
+                    RGB::from_f32(0.0, 0.5, 0.5)
+                } else {
+                    RGB::from_f32(0.0, 0.2, 0.2)
+                },
+                RGB::named(rltk::BLACK),
+                rltk::to_cp437('.'),
+            ),
+            Tile::Wall => (
+                if self.visible[idx] {
+                    RGB::from_f32(0.4, 0.4, 0.4)
+                } else {
+                    RGB::from_f32(0.2, 0.2, 0.2)
+                },
+                RGB::named(rltk::BLACK),
+                rltk::to_cp437('#'),
+            ),
+        }
     }
 }
 

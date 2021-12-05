@@ -1,7 +1,11 @@
 use crate::{
+    camera,
     components::*,
-    gui::{draw_ui, show_inventory, show_targeting, GameLog, TargetingResult},
-    map::{Map, Tile},
+    game_save::{load_game, save_game},
+    gui::{
+        draw_ui, show_inventory, show_main_menu, show_targeting, GameLog, MainMenuSelection,
+        TargetingResult,
+    },
     player::{player_input, Player},
     systems::{
         ai::EnemyAI,
@@ -11,7 +15,7 @@ use crate::{
         visability::VisibilitySystem,
     },
 };
-use rltk::{GameState, Rltk, RGB};
+use rltk::{GameState, Rltk};
 use specs::{prelude::*, rayon::iter::ParallelExtend};
 
 pub struct State {
@@ -30,6 +34,9 @@ pub enum RunState {
         item: Entity,
         radius: Option<i32>,
     },
+    MainMenu(MainMenuSelection),
+    SaveGame,
+    LoadGame,
 }
 
 impl State {
@@ -101,58 +108,20 @@ impl State {
             .expect("Unable to delete dead");
         self.ecs.maintain();
     }
-
-    fn draw_entities(&mut self, ctx: &mut Rltk) {
-        let map = self.ecs.fetch::<Map>();
-        let positions = self.ecs.read_storage::<Position>();
-        let renderables = self.ecs.read_storage::<Renderable>();
-        let mut to_render = (&positions, &renderables).join().collect::<Vec<_>>();
-        to_render.sort_by(|&(_, r1), &(_, r2)| r1.render_order.cmp(&r2.render_order));
-        for (pos, render) in to_render {
-            let coords = map.coords_to_idx(pos.x, pos.y);
-            if map.visible[coords] {
-                ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph)
-            }
-        }
-    }
-
-    fn draw_map(&mut self, ctx: &mut Rltk) {
-        let map = self.ecs.fetch::<Map>();
-        for x in 0..map.dim_x {
-            for y in 0..map.dim_y {
-                let coords = map.coords_to_idx(x, y);
-                if map.revealed[coords] {
-                    let tile = map[(x, y)];
-                    let (glyph, fg) = match tile {
-                        Tile::Floor => (
-                            rltk::to_cp437('.'),
-                            if map.visible[coords] {
-                                RGB::from_f32(0.0, 0.5, 0.5)
-                            } else {
-                                RGB::from_f32(0.0, 0.2, 0.2)
-                            },
-                        ),
-                        Tile::Wall => (
-                            rltk::to_cp437('#'),
-                            if map.visible[coords] {
-                                RGB::from_f32(0.4, 0.4, 0.4)
-                            } else {
-                                RGB::from_f32(0.2, 0.2, 0.2)
-                            },
-                        ),
-                    };
-                    ctx.set(x, y, fg, RGB::from_f32(0., 0., 0.), glyph);
-                }
-            }
-        }
-    }
 }
 
 impl GameState for State {
     fn tick(&mut self, ctx: &mut Rltk) {
         ctx.cls();
-        self.draw_map(ctx);
         let mut new_run_state = { *self.ecs.fetch::<RunState>() };
+
+        match new_run_state {
+            RunState::MainMenu(_) => {}
+            _ => {
+                camera::render(&self.ecs, ctx);
+                draw_ui(&self.ecs, ctx);
+            }
+        }
         new_run_state = match new_run_state {
             RunState::PreRun => {
                 self.run_systems();
@@ -238,15 +207,29 @@ impl GameState for State {
                     radius,
                 },
             },
+            RunState::MainMenu(_) => match show_main_menu(&mut self.ecs, ctx) {
+                crate::gui::MainMenuResult::Selected(sel) => RunState::MainMenu(sel),
+                crate::gui::MainMenuResult::Confirmed(selection) => match selection {
+                    MainMenuSelection::NewGame => RunState::PreRun,
+                    MainMenuSelection::SaveGame => RunState::SaveGame,
+                    MainMenuSelection::LoadGame => {
+                        load_game(&mut self.ecs);
+                        RunState::PreRun
+                    }
+                    MainMenuSelection::Quit => std::process::exit(0),
+                },
+            },
+            RunState::SaveGame => {
+                save_game(&mut self.ecs);
+                RunState::MainMenu(MainMenuSelection::SaveGame)
+            }
+            RunState::LoadGame => todo!(),
         };
-        self.draw_entities(ctx);
         {
             let mut runwriter = self.ecs.write_resource::<RunState>();
             *runwriter = new_run_state;
         }
 
         self.delete_dead();
-
-        draw_ui(&self.ecs, ctx);
     }
 }

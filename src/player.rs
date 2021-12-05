@@ -4,8 +4,14 @@ use crate::components::*;
 use crate::gui::GameLog;
 use crate::{map::Map, state::RunState};
 use rltk::{Point, Rltk, VirtualKeyCode};
+use serde::{Deserialize, Serialize};
+#[allow(deprecated)]
+use specs::error::NoError;
 use specs::prelude::*;
+use specs::saveload::{ConvertSaveload, Marker};
+use specs_derive::ConvertSaveload;
 
+#[derive(ConvertSaveload, Clone)]
 pub struct Player {
     pub entity: Entity,
     pub position: Point,
@@ -26,6 +32,7 @@ pub fn player_input(ecs: &mut World, ctx: &mut Rltk) -> RunState {
             X => try_move_player(ecs, 1, 1),
             G => get_item(ecs),
             I => return RunState::ShowInventory,
+            Escape => return RunState::MainMenu(crate::gui::MainMenuSelection::SaveGame),
             _ => return RunState::AwaitingInput,
         },
     }
@@ -48,7 +55,6 @@ fn get_item(ecs: &mut World) {
     match target_item {
         None => gamelog.entry("There is nothing here to pick up.".to_string()),
         Some(item) => {
-            println!("Picking up");
             let mut pickup = ecs.write_storage::<WantsToPickUp>();
             pickup
                 .insert(
@@ -73,8 +79,8 @@ fn try_move_player(ecs: &mut World, delta_x: i32, delta_y: i32) {
     let map = ecs.fetch::<Map>();
 
     for (_, pos, vis) in (&mut players, &mut positions, &mut viewsheds).join() {
-        let x = min(79, max(0, pos.x + delta_x));
-        let y = min(49, max(0, pos.y + delta_y));
+        let x = min(map.dim_x, max(0, pos.x + delta_x));
+        let y = min(map.dim_y, max(0, pos.y + delta_y));
         for maybe_target in map.tile_content[map.coords_to_idx(x, y)].iter() {
             if let Some(_t) = stats.get(*maybe_target) {
                 melee

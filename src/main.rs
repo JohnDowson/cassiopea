@@ -1,11 +1,12 @@
 use cassiopea::{
     components::*,
-    gui::GameLog,
+    gui::{GameLog, MainMenuSelection},
     map::Map,
     spawner::{player, spawn_room},
     state::{RunState, State},
 };
 use specs::prelude::*;
+use specs::saveload::{SimpleMarker, SimpleMarkerAllocator};
 
 fn main() -> rltk::BError {
     use rltk::RltkBuilder;
@@ -15,6 +16,9 @@ fn main() -> rltk::BError {
         .build()?;
 
     let mut gs = State { ecs: World::new() };
+    gs.ecs.register::<SimpleMarker<SerializeMe>>();
+    gs.ecs.insert(SimpleMarkerAllocator::<SerializeMe>::new());
+
     gs.ecs.register::<Position>();
     gs.ecs.register::<Renderable>();
     gs.ecs.register::<Control>();
@@ -32,8 +36,9 @@ fn main() -> rltk::BError {
     gs.ecs.register::<HasInventory>();
     gs.ecs.register::<WantsToPickUp>();
     gs.ecs.register::<WantsToUseItem>();
+    gs.ecs.register::<SerializationHelper>();
 
-    let map = Map::new(80, 43);
+    let map = Map::new(256, 256, 1);
 
     let mut rng = rltk::RandomNumberGenerator::new();
     let (x, y) = rng.random_slice_entry(&map.rooms).unwrap().center();
@@ -41,7 +46,8 @@ fn main() -> rltk::BError {
 
     gs.ecs.insert(player);
     gs.ecs.insert(map);
-    gs.ecs.insert(RunState::PreRun);
+    gs.ecs
+        .insert(RunState::MainMenu(MainMenuSelection::NewGame));
     gs.ecs.insert(GameLog::default());
     gs.ecs.insert(rltk::RandomNumberGenerator::seeded(69));
 

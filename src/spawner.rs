@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use crate::{components::*, map::Map, player::Player};
 use rltk::{to_cp437, Point, RandomNumberGenerator, RGB};
-use specs::prelude::*;
+use specs::{
+    prelude::*,
+    saveload::{MarkedBuilder, SimpleMarker},
+};
 
 pub fn player(ecs: &mut World, x: i32, y: i32) -> Player {
     let entity = ecs
@@ -31,6 +34,7 @@ pub fn player(ecs: &mut World, x: i32, y: i32) -> Player {
             name: "Player".to_string(),
         })
         .with(HasInventory)
+        .marked::<SimpleMarker<SerializeMe>>()
         .build();
     let position = Point::new(x, y);
     Player { entity, position }
@@ -65,6 +69,7 @@ pub fn random_enemy(ecs: &mut World, x: i32, y: i32) {
             hp: 5,
             defense: 5,
         })
+        .marked::<SimpleMarker<SerializeMe>>()
         .build();
 }
 
@@ -136,6 +141,7 @@ fn healing_cell(ecs: &mut World, x: i32, y: i32) {
         .with(Item)
         .with(Consumable)
         .with(Effect::HealSelf(9))
+        .marked::<SimpleMarker<SerializeMe>>()
         .build();
 }
 
@@ -157,6 +163,7 @@ fn laser_cell(ecs: &mut World, x: i32, y: i32) {
             range: 5,
             damage: 10,
         })
+        .marked::<SimpleMarker<SerializeMe>>()
         .build();
 }
 
@@ -179,5 +186,6 @@ fn compact_missile(ecs: &mut World, x: i32, y: i32) {
             damage: 10,
             radius: 3,
         })
+        .marked::<SimpleMarker<SerializeMe>>()
         .build();
 }

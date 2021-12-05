@@ -53,9 +53,11 @@ impl<'a> System<'a> for DamageSystem {
     fn run(&mut self, data: Self::SystemData) {
         let (mut stats, mut damage) = data;
 
-        for (mut stats, damage) in (&mut stats, &damage).join() {
-            stats.hp -= damage.amount;
-        }
+        (&mut stats, &damage)
+            .par_join()
+            .for_each(|(mut stats, damage)| {
+                stats.hp -= damage.amount;
+            });
         damage.clear();
     }
 }

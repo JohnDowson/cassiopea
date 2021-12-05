@@ -1,7 +1,12 @@
+use std::cmp::min;
+
 use crate::{
+    camera,
     components::{Consumable, Control, InInventory, Name, Position, Stats, Viewshed},
     map::Map,
     player::Player,
+    state::RunState,
+    DBG_SHOW_COORDINATE_TOOLTIP,
 };
 use rltk::{Point, Rltk, VirtualKeyCode, RGB};
 use specs::prelude::*;
@@ -62,33 +67,43 @@ pub fn draw_ui(ecs: &World, ctx: &mut Rltk) {
         let health = format!("{}/{}", stats.hp, stats.base_hp);
 
         ctx.print(1, 43, &health);
-        ctx.draw_bar_vertical(
-            1,
-            44,
-            5,
-            stats.hp,
-            stats.base_hp,
-            RGB::named(rltk::RED),
-            RGB::named(rltk::BLACK),
-        )
+        const MAX_BARS: i32 = 5;
+        let per_bar = stats.base_hp / MAX_BARS;
+        for i in 0..min(stats.base_hp / per_bar, MAX_BARS) {
+            ctx.draw_bar_vertical(
+                1 + i,
+                44,
+                5,
+                (stats.hp - i * per_bar).clamp(0, per_bar),
+                per_bar,
+                RGB::named(rltk::RED),
+                RGB::named(rltk::BLACK),
+            );
+        }
     }
     let mouse_pos = ctx.mouse_pos();
     ctx.set_bg(mouse_pos.0, mouse_pos.1, RGB::named(rltk::MAGENTA));
     draw_tooltips(ecs, ctx)
 }
+
 fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
+    let (min_x, min_y, _, _) = camera::get_bounds(ecs, ctx);
     let map = ecs.fetch::<Map>();
     let names = ecs.read_storage::<Name>();
     let positions = ecs.read_storage::<Position>();
     let mouse_pos = ctx.mouse_pos();
-    if mouse_pos.0 >= map.dim_x || mouse_pos.1 >= map.dim_y {
+    let mut map_mouse_pos = mouse_pos;
+    map_mouse_pos.0 += min_x;
+    map_mouse_pos.1 += min_y;
+
+    if mouse_pos.0 >= map.dim_x || mouse_pos.1 >= map.dim_y || mouse_pos.0 < 1 || mouse_pos.1 < 1 {
         return;
     }
     let tooltip: Vec<String> = (&names, &positions)
-        .join()
+        .par_join()
         .filter_map(|(name, position)| {
-            if position.x == mouse_pos.0
-                && position.y == mouse_pos.1
+            if position.x == map_mouse_pos.0
+                && position.y == map_mouse_pos.1
                 && map.is_visible(position.x, position.y)
             {
                 Some(name.name.clone())
@@ -170,6 +185,28 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
                 &"<-".to_string(),
             );
         }
+    } else if DBG_SHOW_COORDINATE_TOOLTIP {
+        let arrow_pos = Point::new(mouse_pos.0 - 2, mouse_pos.1);
+        let left_x = mouse_pos.0 - 8;
+        let y = mouse_pos.1;
+        let s = format!("x{};y{}", map_mouse_pos.0, map_mouse_pos.1);
+        ctx.print_color(
+            left_x,
+            y,
+            RGB::named(rltk::WHITE),
+            RGB::named(rltk::GREY),
+            &s,
+        );
+        let padding = (8 - s.len() as i32) - 1;
+        for i in 0..padding {
+            ctx.print_color(
+                arrow_pos.x - i,
+                y,
+                RGB::named(rltk::WHITE),
+                RGB::named(rltk::GREY),
+                &" ".to_string(),
+            );
+        }
     }
 }
 
@@ -186,7 +223,7 @@ pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
     let consumables = ecs.read_storage::<Consumable>();
 
     let inventory = (&inventory, &names)
-        .join()
+        .par_join()
         .filter_map(|(inv, name)| {
             if inv.owner == player.entity {
                 Some((inv.item, name.name.clone()))
@@ -282,6 +319,7 @@ pub fn show_targeting(
     range: i32,
     radius: Option<i32>,
 ) -> TargetingResult {
+    let (min_x, min_y, max_x, max_y) = camera::get_bounds(ecs, ctx);
     let player = ecs.fetch::<Player>();
     let viewsheds = ecs.read_storage::<Viewshed>();
 
@@ -299,8 +337,16 @@ pub fn show_targeting(
         for p in &visible.visible_tiles {
             let distance = rltk::DistanceAlg::Pythagoras.distance2d(player.position, *p);
             if distance <= range as f32 {
-                ctx.set_bg(p.x, p.y, RGB::named(rltk::YELLOWGREEN));
-                available.push(p);
+                let screen_x = p.x - min_x;
+                let screen_y = p.y - min_y;
+                if screen_x > 1
+                    && screen_x < (max_x - min_x) - 1
+                    && screen_y > 1
+                    && screen_y < (max_y - min_y) - 1
+                {
+                    ctx.set_bg(screen_x, screen_y, RGB::named(rltk::YELLOWGREEN));
+                    available.push(p);
+                }
             }
         }
     } else {
@@ -308,23 +354,28 @@ pub fn show_targeting(
     }
 
     let mouse_pos = ctx.mouse_pos();
+    let mut map_mouse_pos = mouse_pos;
+    map_mouse_pos.0 += min_x;
+    map_mouse_pos.1 += min_y;
     let valid_target = available
         .into_iter()
-        .any(|p| p.x == mouse_pos.0 && p.y == mouse_pos.1);
+        .any(|p| p.x == map_mouse_pos.0 && p.y == map_mouse_pos.1);
 
     if valid_target {
-        let (x, y) = (mouse_pos.0, mouse_pos.1);
-        ctx.set_bg(x, y, RGB::named(rltk::CYAN));
+        ctx.set_bg(mouse_pos.0, mouse_pos.1, RGB::named(rltk::CYAN));
         if let (Some(radius), Some(visible)) = (radius, viewsheds.get(player.entity)) {
             for p in &visible.visible_tiles {
-                let distance = rltk::DistanceAlg::Pythagoras.distance2d(Point::new(x, y), *p);
+                let distance = rltk::DistanceAlg::Pythagoras
+                    .distance2d(Point::new(map_mouse_pos.0, map_mouse_pos.1), *p);
                 if distance <= radius as f32 {
-                    ctx.set_bg(p.x, p.y, RGB::named(rltk::ORANGE_RED));
+                    let screen_x = p.x - min_x;
+                    let screen_y = p.y - min_y;
+                    ctx.set_bg(screen_x, screen_y, RGB::named(rltk::ORANGE_RED));
                 }
             }
         }
         if ctx.left_click {
-            return TargetingResult::Tile(x, y);
+            return TargetingResult::Tile(map_mouse_pos.0, map_mouse_pos.1);
         }
     } else {
         ctx.set_bg(mouse_pos.0, mouse_pos.1, RGB::named(rltk::RED));
@@ -333,4 +384,79 @@ pub fn show_targeting(
         }
     }
     TargetingResult::NoResponse
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum MainMenuSelection {
+    NewGame,
+    SaveGame,
+    LoadGame,
+    Quit,
+}
+pub enum MainMenuResult {
+    Selected(MainMenuSelection),
+    Confirmed(MainMenuSelection),
+}
+
+pub fn show_main_menu(ecs: &mut World, ctx: &mut Rltk) -> MainMenuResult {
+    static ACTIVE: (u8, u8, u8) = rltk::YELLOWGREEN;
+    static INACTIVE: (u8, u8, u8) = rltk::WHITE;
+    let run_state = ecs.fetch::<RunState>();
+    if let RunState::MainMenu(selection) = *run_state {
+        let (new_game_color, load_game_color, quit_color, save_color) = match selection {
+            MainMenuSelection::NewGame => (ACTIVE, INACTIVE, INACTIVE, INACTIVE),
+            MainMenuSelection::SaveGame => (INACTIVE, INACTIVE, INACTIVE, ACTIVE),
+            MainMenuSelection::LoadGame => (INACTIVE, ACTIVE, INACTIVE, INACTIVE),
+            MainMenuSelection::Quit => (INACTIVE, INACTIVE, ACTIVE, INACTIVE),
+        };
+        ctx.print_color_centered(
+            20,
+            RGB::named(new_game_color),
+            RGB::named(rltk::BLACK),
+            "New Game",
+        );
+        ctx.print_color_centered(
+            21,
+            RGB::named(save_color),
+            RGB::named(rltk::BLACK),
+            "Save Game",
+        );
+        ctx.print_color_centered(
+            22,
+            RGB::named(load_game_color),
+            RGB::named(rltk::BLACK),
+            "Load Game",
+        );
+        ctx.print_color_centered(23, RGB::named(quit_color), RGB::named(rltk::BLACK), "Quit");
+        use VirtualKeyCode::*;
+        match ctx.key {
+            Some(key) => match key {
+                Up => selection_next(selection),
+                Down => selection_previous(selection),
+                Return => MainMenuResult::Confirmed(selection),
+                _ => MainMenuResult::Selected(selection),
+            },
+            None => MainMenuResult::Selected(selection),
+        }
+    } else {
+        MainMenuResult::Selected(MainMenuSelection::NewGame)
+    }
+}
+
+fn selection_next(selection: MainMenuSelection) -> MainMenuResult {
+    MainMenuResult::Selected(match selection {
+        MainMenuSelection::NewGame => MainMenuSelection::Quit,
+        MainMenuSelection::SaveGame => MainMenuSelection::NewGame,
+        MainMenuSelection::LoadGame => MainMenuSelection::SaveGame,
+        MainMenuSelection::Quit => MainMenuSelection::LoadGame,
+    })
+}
+
+fn selection_previous(selection: MainMenuSelection) -> MainMenuResult {
+    MainMenuResult::Selected(match selection {
+        MainMenuSelection::NewGame => MainMenuSelection::SaveGame,
+        MainMenuSelection::SaveGame => MainMenuSelection::LoadGame,
+        MainMenuSelection::LoadGame => MainMenuSelection::Quit,
+        MainMenuSelection::Quit => MainMenuSelection::NewGame,
+    })
 }
