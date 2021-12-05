@@ -31,6 +31,10 @@ fn main() -> rltk::BError {
     gs.ecs.register::<TakeDamage>();
     gs.ecs.register::<Item>();
     gs.ecs.register::<Consumable>();
+    gs.ecs.register::<Equippable>();
+    gs.ecs.register::<Slots>();
+    gs.ecs.register::<Equipped>();
+    gs.ecs.register::<EquipBonus>();
     gs.ecs.register::<Effect>();
     gs.ecs.register::<InInventory>();
     gs.ecs.register::<HasInventory>();
@@ -38,7 +42,7 @@ fn main() -> rltk::BError {
     gs.ecs.register::<WantsToUseItem>();
     gs.ecs.register::<SerializationHelper>();
 
-    let map = Map::new(256, 256, 1);
+    let map = Map::new(60, 60, 1);
 
     let mut rng = rltk::RandomNumberGenerator::new();
     let (x, y) = rng.random_slice_entry(&map.rooms).unwrap().center();

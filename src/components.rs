@@ -69,6 +69,8 @@ pub struct Stats {
     pub base_hp: i32,
     pub hp: i32,
     pub defense: i32,
+    pub compute: i32,
+    pub base_compute: i32,
 }
 
 #[derive(Component, Debug, ConvertSaveload, Clone)]
@@ -93,6 +95,32 @@ pub struct Item;
 
 #[derive(Component, Debug, Serialize, Deserialize, Clone)]
 pub struct Consumable;
+
+#[derive(Component, Debug, ConvertSaveload, Clone)]
+pub struct Equippable {
+    pub slot: Slot,
+}
+
+#[derive(
+    PartialEq, Eq, PartialOrd, Ord, Hash, Component, Debug, Serialize, Deserialize, Clone, Copy,
+)]
+pub enum Slot {
+    Head,
+    Hands,
+    Body,
+}
+
+#[derive(Component, Debug, ConvertSaveload, Clone)]
+pub struct Equipped {
+    pub owner: Entity,
+    pub slot: Slot,
+    pub item: Entity,
+}
+
+#[derive(Component, Debug, Serialize, Deserialize, Clone)]
+pub struct Slots {
+    pub slots: HashSet<Slot>,
+}
 
 #[derive(Component, Debug, Clone, Copy, ConvertSaveload)]
 pub struct InInventory {
@@ -134,6 +162,11 @@ pub enum Effect {
         damage: i32,
         radius: i32,
     },
+}
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+pub enum EquipBonus {
+    Defense(i32),
+    Attack(i32),
 }
 
 #[derive(Component, Debug, Serialize, Deserialize, Clone)]

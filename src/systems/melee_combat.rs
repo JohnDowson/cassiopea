@@ -1,8 +1,8 @@
 use crate::{
-    components::{MeleeAttack, Name, Stats, TakeDamage},
+    components::{EquipBonus, Equipped, MeleeAttack, Name, Stats, TakeDamage},
     gui::GameLog,
 };
-use specs::prelude::*;
+use specs::{prelude::*, rayon::iter::Either};
 
 pub struct MeleeCombatSystem;
 
@@ -15,16 +15,45 @@ impl<'a> System<'a> for MeleeCombatSystem {
         ReadStorage<'a, Stats>,
         WriteStorage<'a, TakeDamage>,
         WriteExpect<'a, GameLog>,
+        ReadStorage<'a, EquipBonus>,
+        ReadStorage<'a, Equipped>,
     );
 
-    fn run(&mut self, (entities, mut melee, names, stats, mut damage, mut log): Self::SystemData) {
-        for (_, melee, name, stat) in (&entities, &melee, &names, &stats).join() {
+    fn run(
+        &mut self,
+        (entities, mut melee, names, stats, mut damage, mut log, bonus, equipped): Self::SystemData,
+    ) {
+        for (attacker, melee, name, stat) in (&entities, &melee, &names, &stats).join() {
             if stat.hp > 0 {
                 let target_stats = stats.get(melee.target).unwrap();
                 if target_stats.hp > 0 {
                     let target_name = names.get(melee.target).unwrap();
-
-                    let dmg_amount = i32::max(0, stat.base_power - target_stats.defense);
+                    let (target_equipped, attacker_equipped): (Vec<_>, Vec<_>) =
+                        (&equipped, &bonus)
+                            .par_join()
+                            .filter(|(e, _)| e.owner == melee.target || e.owner == attacker)
+                            .partition_map(|(e, b)| {
+                                if e.owner == melee.target {
+                                    Either::Left(b)
+                                } else {
+                                    Either::Right(b)
+                                }
+                            });
+                    let effective_power =
+                        attacker_equipped
+                            .into_iter()
+                            .fold(stat.base_power, |power, b| match b {
+                                EquipBonus::Defense(_) => power,
+                                EquipBonus::Attack(b) => power + b,
+                            });
+                    let effective_defense = target_equipped.into_iter().fold(
+                        target_stats.defense,
+                        |defense, b| match b {
+                            EquipBonus::Defense(bonus) => defense + bonus,
+                            EquipBonus::Attack(_) => defense,
+                        },
+                    );
+                    let dmg_amount = i32::max(0, dbg! {effective_power} - dbg! {effective_defense});
 
                     if dmg_amount == 0 {
                         log.entry(format!(

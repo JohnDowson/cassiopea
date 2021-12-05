@@ -68,6 +68,10 @@ impl<'a> System<'a> for ItemConsumptionSystem {
         WriteStorage<'a, TakeDamage>,
         ReadExpect<'a, Map>,
         ReadStorage<'a, Item>,
+        ReadStorage<'a, Equippable>,
+        WriteStorage<'a, Equipped>,
+        ReadStorage<'a, Slots>,
+        WriteStorage<'a, InInventory>,
     );
 
     fn run(
@@ -83,19 +87,22 @@ impl<'a> System<'a> for ItemConsumptionSystem {
             mut take_damage,
             map,
             items,
+            equippables,
+            mut equippeds,
+            slots,
+            mut in_invenory,
         ): Self::SystemData,
     ) {
         for (entity, wants, stats) in (&entities, &wants_use, &mut combat_stats).join() {
             let effect = effects.get(wants.item);
-            match effect {
-                None => {}
-                Some(effect) => match effect {
+            if let Some(effect) = effect {
+                match effect {
                     Effect::HealSelf(amount) => {
                         stats.hp = i32::min(stats.base_hp, stats.hp + amount);
                         if entity == player.entity {
                             gamelog.entry(format!(
-                                "You drink the {}, healing {} hp.",
-                                names.get(wants.item).unwrap().name,
+                                "You use the {}, healing {} hp.",
+                                names.get(wants.item).unwrap(),
                                 amount
                             ));
                         }
@@ -152,7 +159,50 @@ impl<'a> System<'a> for ItemConsumptionSystem {
                             entities.delete(wants.item).expect("Delete failed");
                         }
                     },
-                },
+                }
+            } else {
+                let equip = equippables.get(wants.item);
+                if let Some(equip) = equip {
+                    let slots = slots.get(entity);
+                    if let Some(slots) = slots {
+                        if slots.slots.contains(&equip.slot) {
+                            in_invenory.remove(wants.item);
+                            let unequip = (&entities, &equippeds, &names)
+                                .par_join()
+                                .find_map_first(|(item, e, name)| {
+                                    if e.slot == equip.slot && e.owner == entity {
+                                        Some((item, name))
+                                    } else {
+                                        None
+                                    }
+                                });
+                            if let Some((item, name)) = unequip {
+                                equippeds.remove(item).expect("Failed to unequip item");
+                                in_invenory
+                                    .insert(
+                                        item,
+                                        InInventory {
+                                            owner: entity,
+                                            item,
+                                        },
+                                    )
+                                    .expect("Failed to put item into inventory");
+                                gamelog.entry(format!("You unequip {}", name));
+                            }
+                            equippeds
+                                .insert(
+                                    wants.item,
+                                    Equipped {
+                                        owner: entity,
+                                        slot: equip.slot,
+                                        item: wants.item,
+                                    },
+                                )
+                                .expect("Couldn't equip item");
+                            gamelog.entry(format!("You equip {}", names.get(wants.item).unwrap()));
+                        }
+                    }
+                }
             }
         }
 

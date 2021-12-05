@@ -1,6 +1,6 @@
 use std::{
     cmp::{max, min},
-    ops::{BitAnd, Index, IndexMut},
+    ops::{Index, IndexMut},
 };
 
 use rltk::{Algorithm2D, BaseMap, Point, RGB};
@@ -10,6 +10,8 @@ use specs::Entity;
 pub enum Tile {
     Wall,
     Floor,
+    TerminalDown,
+    TerminalUp,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -36,18 +38,24 @@ impl Rect {
 
         (x1, y1, x2, y2)
     }
-}
 
-impl BitAnd<&Rect> for &Rect {
-    type Output = bool;
-
-    fn bitand(self, rhs: &Rect) -> Self::Output {
+    fn intersects(&self, other: &Self) -> bool {
         let (x1, y1) = self.top_left;
         let (x2, y2) = self.bottom_right;
-        let (rhs_x1, rhs_y1) = rhs.top_left;
-        let (rhs_x2, rhs_y2) = rhs.bottom_right;
+        let (rhs_x1, rhs_y1) = other.top_left;
+        let (rhs_x2, rhs_y2) = other.bottom_right;
         x1 <= rhs_x2 && x2 >= rhs_x1 && y1 <= rhs_y2 && y2 >= rhs_y1
     }
+}
+
+#[test]
+fn intersecting() {
+    let a = Rect::new(0, 0, 10, 10);
+    let b = Rect::new(0, 0, 10, 10);
+    assert! {a.intersects(&b)};
+    let a = Rect::new(11, 0, 10, 10);
+    let b = Rect::new(0, 0, 10, 10);
+    assert! {!a.intersects(&b)};
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,15 +115,13 @@ impl Map {
 
         let mut rng = rltk::RandomNumberGenerator::new();
         for _ in 0..dim_x / 4 {
+            // FIXME: Fix room sticking out of bounds
             let w = rng.range(5, 20);
             let h = rng.range(3, 10);
-            let x = rng.roll_dice(1, dim_x - w - 1);
-            let y = rng.roll_dice(1, dim_y - h - 1);
+            let x = rng.roll_dice(1, (dim_x - 1) - w);
+            let y = rng.roll_dice(1, (dim_y - 1) - h);
             let new_room = Rect::new(x, y, w, h);
-            let mut ok = true;
-            for room in new.rooms.iter() {
-                ok = !(room & &new_room)
-            }
+            let ok = !new.rooms.iter().any(|room| room.intersects(&new_room));
             if ok {
                 new.add_room(&new_room);
 
@@ -134,6 +140,8 @@ impl Map {
                 new.rooms.push(new_room);
             }
         }
+        let coords = new.rooms.last().unwrap().center();
+        new[coords] = Tile::TerminalDown;
         new.populate_passable();
         new
     }
@@ -146,7 +154,7 @@ impl Map {
 
     pub fn populate_passable(&mut self) {
         for (i, tile) in self.inner.iter().enumerate() {
-            self.passable[i] = *tile == Tile::Floor;
+            self.passable[i] = *tile == Tile::Floor || *tile == Tile::TerminalDown;
         }
     }
 
@@ -211,6 +219,24 @@ impl Map {
                 },
                 RGB::named(rltk::BLACK),
                 rltk::to_cp437('#'),
+            ),
+            Tile::TerminalDown => (
+                if self.visible[idx] {
+                    RGB::from_f32(0.4, 0.4, 0.4)
+                } else {
+                    RGB::from_f32(0.2, 0.2, 0.2)
+                },
+                RGB::named(rltk::SKY_BLUE),
+                rltk::to_cp437('▼'),
+            ),
+            Tile::TerminalUp => (
+                if self.visible[idx] {
+                    RGB::from_f32(0.4, 0.4, 0.4)
+                } else {
+                    RGB::from_f32(0.2, 0.2, 0.2)
+                },
+                RGB::named(rltk::SKY_BLUE),
+                rltk::to_cp437('▲'),
             ),
         }
     }

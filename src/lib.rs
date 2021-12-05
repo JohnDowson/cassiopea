@@ -4,6 +4,7 @@ pub mod game_save;
 pub mod gui;
 pub mod map;
 pub mod player;
+pub mod random;
 pub mod spawner;
 pub mod state;
 pub mod systems;

@@ -2,7 +2,10 @@ use std::cmp::min;
 
 use crate::{
     camera,
-    components::{Consumable, Control, InInventory, Name, Position, Stats, Viewshed},
+    components::{
+        Consumable, Control, Equippable, Equipped, InInventory, Name, Position, Slot, Slots, Stats,
+        Viewshed,
+    },
     map::Map,
     player::Player,
     state::RunState,
@@ -52,22 +55,58 @@ pub fn draw_ui(ecs: &World, ctx: &mut Rltk) {
         RGB::named(rltk::BLACK),
     );
     let stats = ecs.read_storage::<Stats>();
-    let player = ecs.read_storage::<Control>();
+    let player_control = ecs.read_storage::<Control>();
+    let map = ecs.read_resource::<Map>();
     let log = ecs.fetch::<GameLog>();
+    let equipped = ecs.read_storage::<Equipped>();
+    let slots = ecs.read_storage::<Slots>();
+    let names = ecs.read_storage::<Name>();
+
+    ctx.print_centered(43, format!("LAYER#{}", map.layer));
 
     let mut y = 44;
     for s in log.entries.iter().rev() {
         if y < 49 {
-            ctx.print(20, y, s);
+            ctx.print(42, y, s);
         }
         y += 1;
     }
 
-    for (_, stats) in (&player, &stats).join() {
-        let health = format!("{}/{}", stats.hp, stats.base_hp);
+    let player = ecs.fetch::<Player>();
+    for (_, stats) in (&player_control, &stats).join() {
+        let player_items = (&equipped, &names)
+            .par_join()
+            .filter(|&(e, _)| e.owner == player.entity)
+            .map(|(e, n)| (e.slot, &*n.name))
+            .collect::<Vec<(Slot, &str)>>();
+        for (i, slot) in slots
+            .get(player.entity)
+            .expect("This player has no slots")
+            .slots
+            .iter()
+            .enumerate()
+        {
+            let slot_item = player_items
+                .iter()
+                .find_map(
+                    |(i_slot, name)| {
+                        if i_slot == slot {
+                            Some(*name)
+                        } else {
+                            None
+                        }
+                    },
+                )
+                .unwrap_or("None");
+            ctx.print(21, 44 + i, format!("{:?}:{}", slot, slot_item));
+        }
 
-        ctx.print(1, 43, &health);
+        ctx.print(13, 44, format!("ATK:{}", stats.base_power));
+        ctx.print(13, 45, format!("DEF:{}", stats.defense));
+
         const MAX_BARS: i32 = 5;
+        let health = format!("{}/{}", stats.hp, stats.base_hp);
+        ctx.print(1, 43, &health);
         let per_bar = stats.base_hp / MAX_BARS;
         for i in 0..min(stats.base_hp / per_bar, MAX_BARS) {
             ctx.draw_bar_vertical(
@@ -77,6 +116,21 @@ pub fn draw_ui(ecs: &World, ctx: &mut Rltk) {
                 (stats.hp - i * per_bar).clamp(0, per_bar),
                 per_bar,
                 RGB::named(rltk::RED),
+                RGB::named(rltk::BLACK),
+            );
+        }
+
+        let compute = format!("{}/{}", stats.compute, stats.base_compute);
+        ctx.print(7, 43, &compute);
+        let per_bar = stats.base_compute / MAX_BARS;
+        for i in 0..min(stats.base_compute / per_bar, MAX_BARS) {
+            ctx.draw_bar_vertical(
+                7 + i,
+                44,
+                5,
+                (stats.compute - i * per_bar).clamp(0, per_bar),
+                per_bar,
+                RGB::named(rltk::BLUEVIOLET),
                 RGB::named(rltk::BLACK),
             );
         }
@@ -130,7 +184,7 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
                 ctx.print_color(
                     left_x,
                     y,
-                    RGB::named(rltk::WHITE),
+                    RGB::named(rltk::BLACK),
                     RGB::named(rltk::GREY),
                     s,
                 );
@@ -139,7 +193,7 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
                     ctx.print_color(
                         arrow_pos.x - i,
                         y,
-                        RGB::named(rltk::WHITE),
+                        RGB::named(rltk::BLACK),
                         RGB::named(rltk::GREY),
                         &" ".to_string(),
                     );
@@ -149,7 +203,7 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
             ctx.print_color(
                 arrow_pos.x,
                 arrow_pos.y,
-                RGB::named(rltk::WHITE),
+                RGB::named(rltk::BLACK),
                 RGB::named(rltk::GREY),
                 &"->".to_string(),
             );
@@ -161,7 +215,7 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
                 ctx.print_color(
                     left_x + 1,
                     y,
-                    RGB::named(rltk::WHITE),
+                    RGB::named(rltk::BLACK),
                     RGB::named(rltk::GREY),
                     s,
                 );
@@ -170,7 +224,7 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
                     ctx.print_color(
                         arrow_pos.x + 1 + i,
                         y,
-                        RGB::named(rltk::WHITE),
+                        RGB::named(rltk::BLACK),
                         RGB::named(rltk::GREY),
                         &" ".to_string(),
                     );
@@ -180,7 +234,7 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
             ctx.print_color(
                 arrow_pos.x,
                 arrow_pos.y,
-                RGB::named(rltk::WHITE),
+                RGB::named(rltk::BLACK),
                 RGB::named(rltk::GREY),
                 &"<-".to_string(),
             );
@@ -193,7 +247,7 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
         ctx.print_color(
             left_x,
             y,
-            RGB::named(rltk::WHITE),
+            RGB::named(rltk::BLACK),
             RGB::named(rltk::GREY),
             &s,
         );
@@ -202,7 +256,7 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
             ctx.print_color(
                 arrow_pos.x - i,
                 y,
-                RGB::named(rltk::WHITE),
+                RGB::named(rltk::BLACK),
                 RGB::named(rltk::GREY),
                 &" ".to_string(),
             );
@@ -221,6 +275,7 @@ pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
     let names = ecs.read_storage::<Name>();
     let inventory = ecs.write_storage::<InInventory>();
     let consumables = ecs.read_storage::<Consumable>();
+    let equippables = ecs.read_storage::<Equippable>();
 
     let inventory = (&inventory, &names)
         .par_join()
@@ -293,7 +348,7 @@ pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
                 let selection = rltk::letter_to_option(key);
                 if selection > -1 && selection < count as i32 {
                     let entity = inventory[selection as usize].0;
-                    if consumables.get(entity).is_some() {
+                    if consumables.get(entity).is_some() || equippables.get(entity).is_some() {
                         ItemMenuResult::Selected(entity)
                     } else {
                         ItemMenuResult::NoResponse

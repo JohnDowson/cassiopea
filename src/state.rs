@@ -6,7 +6,9 @@ use crate::{
         draw_ui, show_inventory, show_main_menu, show_targeting, GameLog, MainMenuSelection,
         TargetingResult,
     },
+    map::Map,
     player::{player_input, Player},
+    spawner,
     systems::{
         ai::EnemyAI,
         inventory_system::{ItemCollectionSystem, ItemConsumptionSystem},
@@ -37,6 +39,7 @@ pub enum RunState {
     MainMenu(MainMenuSelection),
     SaveGame,
     LoadGame,
+    NextLayer,
 }
 
 impl State {
@@ -108,6 +111,60 @@ impl State {
             .expect("Unable to delete dead");
         self.ecs.maintain();
     }
+
+    fn next_layer(&mut self) {
+        let delete = self.delete_on_level_change();
+
+        self.ecs
+            .delete_entities(&delete)
+            .expect("Couldnt delete entities on level change");
+
+        let map = {
+            let mut map = self.ecs.write_resource::<Map>();
+            let current_layer = map.layer;
+            let dim_x = map.dim_x;
+            let dim_y = map.dim_y;
+            *map = Map::new(dim_x, dim_y, current_layer + 1);
+            map.clone()
+        };
+        spawner::spawn_room(&mut self.ecs);
+
+        let player_spawn = map.rooms[1].center();
+        let mut player = self.ecs.fetch_mut::<Player>();
+        player.position.x = player_spawn.0;
+        player.position.y = player_spawn.1;
+
+        let mut positions = self.ecs.write_storage::<Position>();
+        if let Some(p_pos) = positions.get_mut(player.entity) {
+            p_pos.x = player_spawn.0;
+            p_pos.y = player_spawn.1;
+        }
+
+        let mut viewsheds = self.ecs.write_storage::<Viewshed>();
+        if let Some(vis) = viewsheds.get_mut(player.entity) {
+            vis.dirty = true
+        }
+
+        let mut log = self.ecs.write_resource::<GameLog>();
+        log.entry("You descend to the next network layer".into())
+    }
+
+    fn delete_on_level_change(&mut self) -> Vec<Entity> {
+        let entities = self.ecs.entities();
+        let player = self.ecs.fetch::<Player>();
+        let in_inventory = self.ecs.read_storage::<InInventory>();
+        entities
+            .par_join()
+            .filter(|&e| {
+                let in_player_inventory = if let Some(i) = in_inventory.get(e) {
+                    i.owner == player.entity
+                } else {
+                    false
+                };
+                e != player.entity || in_player_inventory
+            })
+            .collect::<Vec<_>>()
+    }
 }
 
 impl GameState for State {
@@ -175,7 +232,17 @@ impl GameState for State {
                                 };
                             }
                         },
-                        None => todo!(),
+                        None => {
+                            intent
+                                .insert(
+                                    self.ecs.fetch::<Player>().entity,
+                                    WantsToUseItem {
+                                        item: e,
+                                        target: Target::Itself,
+                                    },
+                                )
+                                .expect("Unable to insert intent");
+                        }
                     };
 
                     new_state
@@ -224,6 +291,10 @@ impl GameState for State {
                 RunState::MainMenu(MainMenuSelection::SaveGame)
             }
             RunState::LoadGame => todo!(),
+            RunState::NextLayer => {
+                self.next_layer();
+                RunState::PreRun
+            }
         };
         {
             let mut runwriter = self.ecs.write_resource::<RunState>();
