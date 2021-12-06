@@ -120,33 +120,12 @@ impl State {
         self.ecs
             .delete_entities(&delete)
             .expect("Couldnt delete entities on level change");
-
-        let player_spawn = {
-            let mut builder = random_map_builder();
-            let (new_map, player_spawn) = {
-                let mut rng = self.ecs.write_resource::<RandomNumberGenerator>();
-                let mut map = self.ecs.write_resource::<Map>();
-                let (new_map, player_spawn) =
-                    builder.build(map.dim_x, map.dim_y, map.layer + 1, &mut *rng);
-                *map = new_map.clone();
-                (new_map, player_spawn)
+        {
+            let (dim_x, dim_y, layer) = {
+                let old_map = self.ecs.read_resource::<Map>();
+                (old_map.dim_x, old_map.dim_y, old_map.layer + 1)
             };
-            let player_spawn = { player_spawn };
-            builder.spawn(&new_map, &mut self.ecs, new_map.layer);
-            player_spawn
-        };
-
-        let mut player = self.ecs.fetch_mut::<Player>();
-        player.position = player_spawn;
-
-        let mut positions = self.ecs.write_storage::<Position>();
-        if let Some(p_pos) = positions.get_mut(player.entity) {
-            *p_pos = player_spawn;
-        }
-
-        let mut viewsheds = self.ecs.write_storage::<Viewshed>();
-        if let Some(vis) = viewsheds.get_mut(player.entity) {
-            vis.dirty = true
+            self.generate_map(dim_x, dim_y, layer)
         }
 
         let mut log = self.ecs.write_resource::<GameLog>();
@@ -168,6 +147,29 @@ impl State {
                 e != player.entity || in_player_inventory
             })
             .collect::<Vec<_>>()
+    }
+
+    pub fn generate_map(&mut self, dim_x: i32, dim_y: i32, layer: i32) {
+        let mut builder = random_map_builder(dim_x, dim_y, layer);
+        let player_spawn = {
+            let player_spawn = {
+                let mut rng = self.ecs.write_resource::<RandomNumberGenerator>();
+                builder.build(&mut *rng);
+                builder.get_player_spawn(&mut *rng)
+            };
+            builder.spawn(&mut self.ecs);
+            player_spawn
+        };
+
+        let map = builder.get_map();
+        *self.ecs.entry::<Map>().or_insert(map) = map.clone();
+
+        let mut player = self.ecs.fetch_mut::<Player>();
+        player.position = player_spawn;
+        let mut positions = self.ecs.write_storage::<Position>();
+        if let Some(p_pos) = positions.get_mut(player.entity) {
+            *p_pos = player_spawn;
+        }
     }
 }
 

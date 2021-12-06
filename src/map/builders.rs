@@ -5,20 +5,29 @@ use specs::prelude::*;
 use std::collections::HashSet;
 
 pub trait MapBuilder {
-    fn build(
-        &mut self,
-        dim_x: i32,
-        dim_y: i32,
-        layer: i32,
-        rng: &mut RandomNumberGenerator,
-    ) -> (Map, Position);
-    fn spawn(&mut self, map: &Map, ecs: &mut World, layer: i32);
+    fn build(&mut self, rng: &mut RandomNumberGenerator);
+    fn get_map(&self) -> Map;
+    fn get_player_spawn(&self, rng: &mut RandomNumberGenerator) -> Position;
+    fn spawn(&mut self, ecs: &mut World);
+    fn take_snapshot(&mut self);
+    fn get_snapshots(&self) -> Vec<Map>;
 }
 
-pub struct SimpleMapBuilder;
+pub struct SimpleMapBuilder {
+    map: Map,
+    snapshots: Vec<Map>,
+}
 
 impl SimpleMapBuilder {
-    fn simple_map(map: &mut Map) {
+    pub fn new(dim_x: i32, dim_y: i32, layer: i32) -> Self {
+        Self {
+            map: Map::new(dim_x, dim_y, layer),
+            snapshots: Vec::new(),
+        }
+    }
+
+    fn simple_map(&mut self) {
+        let map = &mut self.map;
         let dim_x = map.dim_x;
         let dim_y = map.dim_x;
 
@@ -118,22 +127,70 @@ impl SimpleMapBuilder {
 }
 
 impl MapBuilder for SimpleMapBuilder {
-    fn build(
-        &mut self,
-        dim_x: i32,
-        dim_y: i32,
-        layer: i32,
-        rng: &mut RandomNumberGenerator,
-    ) -> (Map, Position) {
-        let mut new = Map::new(dim_x, dim_y, layer);
-        Self::simple_map(&mut new);
-        let (x, y) = rng.random_slice_entry(&new.rooms).unwrap().center();
-        (new, Position { x, y })
+    fn build(&mut self, _rng: &mut RandomNumberGenerator) {
+        self.simple_map()
     }
 
-    fn spawn(&mut self, map: &Map, ecs: &mut World, _layer: i32) {
-        for room in &map.rooms {
-            Self::spawn_room(map, room, ecs)
+    fn get_map(&self) -> Map {
+        self.map.clone()
+    }
+
+    fn get_player_spawn(&self, rng: &mut RandomNumberGenerator) -> Position {
+        let (x, y) = rng.random_slice_entry(&self.map.rooms).unwrap().center();
+        Position { x, y }
+    }
+
+    fn spawn(&mut self, ecs: &mut World) {
+        for room in &self.map.rooms {
+            Self::spawn_room(&self.map, room, ecs)
         }
+    }
+
+    fn take_snapshot(&mut self) {
+        //self.snapshots.push(self.map.as_ref().unwrap().clone())
+    }
+
+    fn get_snapshots(&self) -> Vec<Map> {
+        self.snapshots.clone()
+    }
+}
+
+pub struct BspBuilder {
+    map: Map,
+    // snapshots: Vec<Map>,
+}
+
+impl BspBuilder {
+    pub fn new(dim_x: i32, dim_y: i32, layer: i32) -> Self {
+        Self {
+            map: Map::new(dim_x, dim_y, layer),
+            // snapshots: Vec::new(),
+        }
+    }
+}
+
+impl MapBuilder for BspBuilder {
+    fn build(&mut self, rng: &mut RandomNumberGenerator) {
+        todo!()
+    }
+
+    fn get_map(&self) -> Map {
+        self.map.clone()
+    }
+
+    fn get_player_spawn(&self, rng: &mut RandomNumberGenerator) -> Position {
+        todo!()
+    }
+
+    fn spawn(&mut self, ecs: &mut World) {
+        todo!()
+    }
+
+    fn take_snapshot(&mut self) {
+        todo!()
+    }
+
+    fn get_snapshots(&self) -> Vec<Map> {
+        todo!()
     }
 }

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use rltk::RandomNumberGenerator;
 
-use crate::map::builder::{MapBuilder, SimpleMapBuilder};
+use crate::map::builders::{BspBuilder, MapBuilder, SimpleMapBuilder};
 
 #[derive(Eq)]
 pub struct Entry {
@@ -74,6 +74,7 @@ impl Default for Table {
     }
 }
 
-pub fn random_map_builder() -> Box<dyn MapBuilder> {
-    Box::new(SimpleMapBuilder)
+pub fn random_map_builder(dim_x: i32, dim_y: i32, layer: i32) -> Box<dyn MapBuilder> {
+    //Box::new(SimpleMapBuilder::new(dim_x, dim_y, layer))
+    Box::new(BspBuilder::new(dim_x, dim_y, layer))
 }

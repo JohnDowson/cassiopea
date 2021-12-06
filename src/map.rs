@@ -6,7 +6,7 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-pub mod builder;
+pub mod builders;
 
 #[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub enum Tile {
@@ -95,7 +95,7 @@ impl Map {
     }
 
     pub fn new(dim_x: i32, dim_y: i32, layer: i32) -> Self {
-        let mut new = Self {
+        Self {
             inner: vec![Tile::Wall; (dim_x * dim_y) as usize],
             rooms: Vec::new(),
             revealed: vec![false; (dim_x * dim_y) as usize],
@@ -105,48 +105,7 @@ impl Map {
             dim_x,
             dim_y,
             layer,
-        };
-
-        for x in 0..dim_x {
-            new[(x, 0)] = Tile::Wall;
-            new[(x, dim_y - 1)] = Tile::Wall;
         }
-        for y in 0..dim_y {
-            new[(0, y)] = Tile::Wall;
-            new[(dim_x - 1, y)] = Tile::Wall;
-        }
-
-        let mut rng = rltk::RandomNumberGenerator::new();
-        for _ in 0..dim_x / 4 {
-            // FIXME: Fix room sticking out of bounds
-            let w = rng.range(5, 20);
-            let h = rng.range(3, 10);
-            let x = rng.roll_dice(1, (dim_x - 1) - w);
-            let y = rng.roll_dice(1, (dim_y - 1) - h);
-            let new_room = Rect::new(x, y, w, h);
-            let ok = !new.rooms.iter().any(|room| room.intersects(&new_room));
-            if ok {
-                new.add_room(&new_room);
-
-                if !new.rooms.is_empty() {
-                    let (new_x, new_y) = new_room.center();
-                    let (prev_x, prev_y) = new.rooms[new.rooms.len() - 1].center();
-                    if rng.range(0, 2) == 1 {
-                        new.add_horizontal_tunnel(prev_x, new_x, prev_y);
-                        new.add_vertical_tunnel(prev_y, new_y, new_x);
-                    } else {
-                        new.add_vertical_tunnel(prev_y, new_y, prev_x);
-                        new.add_horizontal_tunnel(prev_x, new_x, new_y);
-                    }
-                }
-
-                new.rooms.push(new_room);
-            }
-        }
-        let coords = new.rooms.last().unwrap().center();
-        new[coords] = Tile::TerminalDown;
-        new.populate_passable();
-        new
     }
 
     pub fn clear_content_index(&mut self) {

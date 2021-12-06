@@ -18,13 +18,13 @@ pub fn room_table() -> random::Table {
         .insert("Memory Shard", 200)
 }
 
-pub fn player(ecs: &mut World, position: Position) -> Player {
+pub fn player(ecs: &mut World) -> Player {
     let mut slots = HashSet::new();
     slots.insert(Slot::Body);
     slots.insert(Slot::Hands);
     let entity = ecs
         .create_entity()
-        .with(position)
+        .with(Position { x: 0, y: 0 })
         .with(Renderable {
             glyph: rltk::to_cp437('@'),
             fg: RGB::named(rltk::YELLOW),
@@ -53,7 +53,10 @@ pub fn player(ecs: &mut World, position: Position) -> Player {
         .with(Slots { slots })
         .marked::<SimpleMarker<SerializeMe>>()
         .build();
-    Player { entity, position }
+    Player {
+        entity,
+        position: Position { x: 0, y: 0 },
+    }
 }
 
 pub fn snake(ecs: &mut World, x: i32, y: i32) {
