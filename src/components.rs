@@ -39,8 +39,9 @@ pub struct Renderable {
 #[derive(Component, Debug, Serialize, Deserialize, Clone)]
 pub struct Control;
 
-#[derive(Component, ConvertSaveload, Clone)]
+#[derive(Component, Serialize, Deserialize, Clone)]
 pub struct Viewshed {
+    #[serde(skip)]
     pub visible_tiles: HashSet<rltk::Point>,
     pub range: i32,
     pub dirty: bool,
@@ -162,6 +163,7 @@ pub enum Effect {
         damage: i32,
         radius: i32,
     },
+    Recharge(i32),
 }
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub enum EquipBonus {

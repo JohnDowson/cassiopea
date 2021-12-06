@@ -46,7 +46,7 @@ fn main() -> rltk::BError {
     gs.ecs.insert(player);
     gs.ecs.insert(rltk::RandomNumberGenerator::seeded(69));
 
-    gs.generate_map(60, 60, 0);
+    gs.generate_map(50, 50, 0);
 
     gs.ecs
         .insert(RunState::MainMenu(MainMenuSelection::NewGame));

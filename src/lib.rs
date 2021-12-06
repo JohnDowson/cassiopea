@@ -9,4 +9,4 @@ pub mod spawner;
 pub mod state;
 pub mod systems;
 
-const DBG_SHOW_COORDINATE_TOOLTIP: bool = false;
+const DBG_SHOW_COORDINATE_TOOLTIP: bool = true;

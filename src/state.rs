@@ -170,6 +170,10 @@ impl State {
         if let Some(p_pos) = positions.get_mut(player.entity) {
             *p_pos = player_spawn;
         }
+        let mut vis = self.ecs.write_storage::<Viewshed>();
+        for vis in (&mut vis).join() {
+            vis.dirty = true;
+        }
     }
 }
 
@@ -237,6 +241,17 @@ impl GameState for State {
                                     item: e,
                                     radius: Some(*radius),
                                 };
+                            }
+                            Effect::Recharge(_) => {
+                                intent
+                                    .insert(
+                                        self.ecs.fetch::<Player>().entity,
+                                        WantsToUseItem {
+                                            item: e,
+                                            target: Target::Itself,
+                                        },
+                                    )
+                                    .expect("Unable to insert intent");
                             }
                         },
                         None => {

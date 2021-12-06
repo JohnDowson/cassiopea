@@ -17,7 +17,7 @@ pub enum Tile {
     TerminalService,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Rect {
     top_left: (i32, i32),
     bottom_right: (i32, i32),
@@ -29,6 +29,18 @@ impl Rect {
             top_left: (x, y),
             bottom_right: (x + w, y + h),
         }
+    }
+    pub fn x1(&self) -> i32 {
+        self.top_left.0
+    }
+    pub fn x2(&self) -> i32 {
+        self.bottom_right.0
+    }
+    pub fn y1(&self) -> i32 {
+        self.top_left.1
+    }
+    pub fn y2(&self) -> i32 {
+        self.bottom_right.1
     }
     pub fn center(&self) -> (i32, i32) {
         let (x1, y1) = self.top_left;
@@ -66,7 +78,9 @@ pub struct Map {
     inner: Vec<Tile>,
     pub rooms: Vec<Rect>,
     pub revealed: Vec<bool>,
+    #[serde(skip)]
     pub visible: Vec<bool>,
+    #[serde(skip)]
     pub passable: Vec<bool>,
     #[serde(skip)]
     pub tile_content: Vec<Vec<Entity>>,
@@ -186,7 +200,7 @@ impl Map {
                     RGB::from_f32(0.2, 0.2, 0.2)
                 },
                 RGB::named(rltk::BLACK),
-                rltk::to_cp437('#'),
+                self.wall_glyph(x, y),
             ),
             Tile::TerminalDown => (
                 if self.visible[idx] {
@@ -215,6 +229,47 @@ impl Map {
                 RGB::named(rltk::SKY_BLUE),
                 rltk::to_cp437('◙'),
             ),
+        }
+    }
+    fn is_revealed_wall(&self, x: i32, y: i32) -> bool {
+        let idx = self.coords_to_idx(x, y);
+        self.revealed[idx] && self.inner[idx] == Tile::Wall
+    }
+    fn wall_glyph(&self, x: i32, y: i32) -> u16 {
+        if x < 1 || x > self.dim_x - 2 || y < 1 || y > self.dim_y - 2 {
+            return 35;
+        }
+        let mut mask = 0u8;
+        if self.is_revealed_wall(x, y - 1) {
+            mask += 1;
+        }
+        if self.is_revealed_wall(x, y + 1) {
+            mask += 2;
+        }
+        if self.is_revealed_wall(x - 1, y) {
+            mask += 4;
+        }
+        if self.is_revealed_wall(x + 1, y) {
+            mask += 8;
+        }
+        match mask {
+            0 => 9,    // Pillar because we can't see neighbors
+            1 => 186,  // Wall only to the north
+            2 => 186,  // Wall only to the south
+            3 => 186,  // Wall to the north and south
+            4 => 205,  // Wall only to the west
+            5 => 188,  // Wall to the north and west
+            6 => 187,  // Wall to the south and west
+            7 => 185,  // Wall to the north, south and west
+            8 => 205,  // Wall only to the east
+            9 => 200,  // Wall to the north and east
+            10 => 201, // Wall to the south and east
+            11 => 204, // Wall to the north, south and east
+            12 => 205, // Wall to the east and west
+            13 => 202, // Wall to the east, west, and south
+            14 => 203, // Wall to the east, west, and north
+            15 => 206, // ╬ Wall on all sides
+            _ => 35,   // We missed one?
         }
     }
 }

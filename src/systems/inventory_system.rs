@@ -159,6 +159,17 @@ impl<'a> System<'a> for ItemConsumptionSystem {
                             entities.delete(wants.item).expect("Delete failed");
                         }
                     },
+                    Effect::Recharge(amount) => {
+                        stats.hp = i32::min(stats.base_compute, stats.compute + amount);
+                        if entity == player.entity {
+                            gamelog.entry(format!(
+                                "You use the {}, healing {} hp.",
+                                names.get(wants.item).unwrap(),
+                                amount
+                            ));
+                        }
+                        entities.delete(wants.item).expect("Delete failed");
+                    }
                 }
             } else {
                 let equip = equippables.get(wants.item);

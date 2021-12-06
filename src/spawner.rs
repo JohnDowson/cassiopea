@@ -15,7 +15,8 @@ pub fn room_table() -> random::Table {
         .insert("Compact missile", 2)
         .insert("Energy Shield", 2)
         .insert("Vibro Blade", 2)
-        .insert("Memory Shard", 200)
+        .insert("Memory Shard", 1)
+        .insert("Energy Cell", 2)
 }
 
 pub fn player(ecs: &mut World) -> Player {
@@ -238,6 +239,25 @@ pub fn memory_shard(ecs: &mut World, x: i32, y: i32) {
         .with(Item)
         .with(Consumable)
         .with(LevelUp { amount: 5 })
+        .marked::<SimpleMarker<SerializeMe>>()
+        .build();
+}
+
+pub fn energy_cell(ecs: &mut World, x: i32, y: i32) {
+    ecs.create_entity()
+        .with(Position { x, y })
+        .with(Renderable {
+            glyph: rltk::to_cp437('~'),
+            fg: RGB::named(rltk::PURPLE),
+            bg: RGB::named(rltk::BLACK),
+            render_order: 0,
+        })
+        .with(Name {
+            name: "Energy Cell".to_string(),
+        })
+        .with(Item)
+        .with(Consumable)
+        .with(Effect::Recharge(5))
         .marked::<SimpleMarker<SerializeMe>>()
         .build();
 }

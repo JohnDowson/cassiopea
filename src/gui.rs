@@ -245,7 +245,25 @@ fn draw_tooltips(ecs: &World, ctx: &mut Rltk) {
         let arrow_pos = Point::new(mouse_pos.0 - 2, mouse_pos.1);
         let left_x = mouse_pos.0 - 8;
         let y = mouse_pos.1;
-        let s = format!("x{};y{}", map_mouse_pos.0, map_mouse_pos.1);
+        let s = format!(
+            "x{};y{};{}",
+            map_mouse_pos.0,
+            map_mouse_pos.1,
+            if map_mouse_pos.0 > 1
+                && map_mouse_pos.1 > 1
+                && map_mouse_pos.0 < map.dim_x - 1
+                && map_mouse_pos.1 < map.dim_y - 1
+            {
+                let idx = map.coords_to_idx(map_mouse_pos.0, map_mouse_pos.1);
+                if map.passable[idx] {
+                    "p"
+                } else {
+                    "!p"
+                }
+            } else {
+                ""
+            }
+        );
         ctx.print_color(
             left_x,
             y,

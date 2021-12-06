@@ -127,6 +127,10 @@ pub fn load_game(ecs: &mut World) {
             let mut worldmap = ecs.write_resource::<Map>();
             *worldmap = h.map.clone();
             worldmap.tile_content = vec![Vec::new(); h.map.size()];
+            worldmap.visible = vec![true; h.map.size()];
+            worldmap.revealed = vec![true; h.map.size()];
+            worldmap.passable = vec![true; h.map.size()];
+            worldmap.populate_passable();
             deleteme = Some(e);
         }
         for (e, _p, pos) in (&entities, &player, &position).join() {
