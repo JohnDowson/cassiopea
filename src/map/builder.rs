@@ -1,5 +1,5 @@
 use super::{Map, Rect, Tile};
-use crate::{components::Position, random::room_table, spawner};
+use crate::{components::Position, spawner};
 use rltk::RandomNumberGenerator;
 use specs::prelude::*;
 use std::collections::HashSet;
@@ -70,30 +70,28 @@ impl SimpleMapBuilder {
         map.populate_passable();
     }
 
-    fn spawn_rooms(map: &Map, ecs: &mut World) {
+    fn spawn_room(map: &Map, room: &Rect, ecs: &mut World) {
         let mut spawn_points = HashSet::new();
         {
             let mut rng = ecs.write_resource::<RandomNumberGenerator>();
-            let num_spawns = dbg! {rng.roll_dice(1, 4 + map.layer) - 1};
-            for room in &map.rooms {
-                for _ in 0..num_spawns {
-                    let mut added = false;
-                    let mut tries = 0;
-                    while !added && tries < 20 {
-                        let (x1, y1, x2, y2) = room.coords();
-                        let x = x1 + rng.roll_dice(1, i32::abs(x2 - x1));
-                        let y = y1 + rng.roll_dice(1, i32::abs(y2 - y1));
+            let num_spawns = rng.roll_dice(1, 4 + map.layer) - 1;
+            for _ in 0..num_spawns {
+                let mut added = false;
+                let mut tries = 0;
+                while !added && tries < 20 {
+                    let (x1, y1, x2, y2) = room.coords();
+                    let x = x1 + rng.roll_dice(1, i32::abs(x2 - x1));
+                    let y = y1 + rng.roll_dice(1, i32::abs(y2 - y1));
 
-                        added = dbg! {spawn_points.insert((x, y))};
-                        if !added {
-                            tries += 1
-                        }
+                    added = spawn_points.insert((x, y));
+                    if !added {
+                        tries += 1
                     }
                 }
             }
         }
 
-        let spawn_table = room_table();
+        let spawn_table = spawner::room_table();
         let spawns = {
             let mut rng = ecs.write_resource::<RandomNumberGenerator>();
             spawn_points
@@ -103,7 +101,7 @@ impl SimpleMapBuilder {
         };
         for ((x, y), spawn) in spawns.into_iter() {
             if let Some(spawn) = spawn {
-                match dbg! {spawn} {
+                match spawn {
                     "Skel" => spawner::skel(ecs, x, y),
                     "Snake" => spawner::snake(ecs, x, y),
                     "Healing cell" => spawner::healing_cell(ecs, x, y),
@@ -111,6 +109,7 @@ impl SimpleMapBuilder {
                     "Compact missile" => spawner::compact_missile(ecs, x, y),
                     "Energy Shield" => spawner::energy_shield(ecs, x, y),
                     "Vibro Blade" => spawner::vibro_blade(ecs, x, y),
+                    "Memory Shard" => spawner::memory_shard(ecs, x, y),
                     _ => {}
                 }
             }
@@ -133,6 +132,8 @@ impl MapBuilder for SimpleMapBuilder {
     }
 
     fn spawn(&mut self, map: &Map, ecs: &mut World, _layer: i32) {
-        Self::spawn_rooms(map, ecs)
+        for room in &map.rooms {
+            Self::spawn_room(map, room, ecs)
+        }
     }
 }

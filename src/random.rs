@@ -74,17 +74,6 @@ impl Default for Table {
     }
 }
 
-pub fn room_table() -> Table {
-    Table::new()
-        .insert("Skel", 8)
-        .insert("Snake", 6)
-        .insert("Healing cell", 3)
-        .insert("Laser cell", 3)
-        .insert("Compact missile", 2)
-        .insert("Energy Shield", 2)
-        .insert("Vibro Blade", 2)
-}
-
 pub fn random_map_builder() -> Box<dyn MapBuilder> {
     Box::new(SimpleMapBuilder)
 }

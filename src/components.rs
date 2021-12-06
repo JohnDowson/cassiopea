@@ -68,7 +68,7 @@ pub struct Stats {
     pub base_power: i32,
     pub base_hp: i32,
     pub hp: i32,
-    pub defense: i32,
+    pub base_defense: i32,
     pub compute: i32,
     pub base_compute: i32,
 }
@@ -175,4 +175,9 @@ pub struct SerializeMe;
 #[derive(Component, ConvertSaveload, Clone)]
 pub struct SerializationHelper {
     pub map: Map,
+}
+
+#[derive(Component, Debug, Serialize, Deserialize, Clone)]
+pub struct LevelUp {
+    pub amount: i32,
 }

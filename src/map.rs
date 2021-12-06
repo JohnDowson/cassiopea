@@ -157,7 +157,13 @@ impl Map {
 
     pub fn populate_passable(&mut self) {
         for (i, tile) in self.inner.iter().enumerate() {
-            self.passable[i] = *tile == Tile::Floor || *tile == Tile::TerminalDown;
+            const PASSABLE_TILES: [Tile; 4] = [
+                Tile::Floor,
+                Tile::TerminalDown,
+                Tile::TerminalService,
+                Tile::TerminalUp,
+            ];
+            self.passable[i] = PASSABLE_TILES.contains(tile);
         }
     }
 

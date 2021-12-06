@@ -47,7 +47,7 @@ impl<'a> System<'a> for MeleeCombatSystem {
                                 EquipBonus::Attack(b) => power + b,
                             });
                     let effective_defense = target_equipped.into_iter().fold(
-                        target_stats.defense,
+                        target_stats.base_defense,
                         |defense, b| match b {
                             EquipBonus::Defense(bonus) => defense + bonus,
                             EquipBonus::Attack(_) => defense,

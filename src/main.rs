@@ -1,8 +1,8 @@
 use cassiopea::{
     components::*,
     gui::{GameLog, MainMenuSelection},
-    map::Map,
-    spawner::{player, spawn_room},
+    random::random_map_builder,
+    spawner::player,
     state::{RunState, State},
 };
 use specs::prelude::*;
@@ -40,22 +40,22 @@ fn main() -> rltk::BError {
     gs.ecs.register::<HasInventory>();
     gs.ecs.register::<WantsToPickUp>();
     gs.ecs.register::<WantsToUseItem>();
+    gs.ecs.register::<LevelUp>();
     gs.ecs.register::<SerializationHelper>();
 
-    let map = Map::new(60, 60, 1);
+    let mut rng = rltk::RandomNumberGenerator::seeded(69);
+    let mut builder = random_map_builder();
+    let (map, player_spawn) = builder.build(60, 60, 0, &mut rng);
 
-    let mut rng = rltk::RandomNumberGenerator::new();
-    let (x, y) = rng.random_slice_entry(&map.rooms).unwrap().center();
-    let player = player(&mut gs.ecs, Position { x, y });
+    gs.ecs.insert(rng);
+    builder.spawn(&map, &mut gs.ecs, 0);
+    let player = player(&mut gs.ecs, player_spawn);
 
     gs.ecs.insert(player);
     gs.ecs.insert(map);
     gs.ecs
         .insert(RunState::MainMenu(MainMenuSelection::NewGame));
     gs.ecs.insert(GameLog::default());
-    gs.ecs.insert(rltk::RandomNumberGenerator::seeded(69));
-
-    spawn_room(&mut gs.ecs);
 
     rltk::main_loop(context, gs)
 }

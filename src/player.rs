@@ -144,7 +144,7 @@ pub fn player(ecs: &mut World, pos: Position) -> Player {
             base_power: 10,
             base_hp: 20,
             hp: 20,
-            defense: 100,
+            base_defense: 100,
             compute: 10,
             base_compute: 10,
         })

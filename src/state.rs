@@ -3,12 +3,12 @@ use crate::{
     components::*,
     game_save::{load_game, save_game},
     gui::{
-        draw_ui, show_inventory, show_main_menu, show_targeting, GameLog, MainMenuSelection,
-        TargetingResult,
+        draw_ui, show_inventory, show_levelup, show_main_menu, show_targeting, GameLog,
+        MainMenuSelection, TargetingResult,
     },
     map::Map,
     player::{player_input, Player},
-    spawner,
+    random::random_map_builder,
     systems::{
         ai::EnemyAI,
         inventory_system::{ItemCollectionSystem, ItemConsumptionSystem},
@@ -17,7 +17,7 @@ use crate::{
         visability::VisibilitySystem,
     },
 };
-use rltk::{GameState, Rltk};
+use rltk::{GameState, RandomNumberGenerator, Rltk};
 use specs::{prelude::*, rayon::iter::ParallelExtend};
 
 pub struct State {
@@ -41,6 +41,7 @@ pub enum RunState {
     LoadGame,
     NextLayer,
     RevealMap(i32),
+    LevelUpMenu(i32),
 }
 
 impl State {
@@ -120,25 +121,27 @@ impl State {
             .delete_entities(&delete)
             .expect("Couldnt delete entities on level change");
 
-        let map = {
-            let mut map = self.ecs.write_resource::<Map>();
-            let current_layer = map.layer;
-            let dim_x = map.dim_x;
-            let dim_y = map.dim_y;
-            *map = Map::new(dim_x, dim_y, current_layer + 1);
-            map.clone()
+        let player_spawn = {
+            let mut builder = random_map_builder();
+            let (new_map, player_spawn) = {
+                let mut rng = self.ecs.write_resource::<RandomNumberGenerator>();
+                let mut map = self.ecs.write_resource::<Map>();
+                let (new_map, player_spawn) =
+                    builder.build(map.dim_x, map.dim_y, map.layer + 1, &mut *rng);
+                *map = new_map.clone();
+                (new_map, player_spawn)
+            };
+            let player_spawn = { player_spawn };
+            builder.spawn(&new_map, &mut self.ecs, new_map.layer);
+            player_spawn
         };
-        spawner::spawn_room(&mut self.ecs);
 
-        let player_spawn = map.rooms[1].center();
         let mut player = self.ecs.fetch_mut::<Player>();
-        player.position.x = player_spawn.0;
-        player.position.y = player_spawn.1;
+        player.position = player_spawn;
 
         let mut positions = self.ecs.write_storage::<Position>();
         if let Some(p_pos) = positions.get_mut(player.entity) {
-            p_pos.x = player_spawn.0;
-            p_pos.y = player_spawn.1;
+            *p_pos = player_spawn;
         }
 
         let mut viewsheds = self.ecs.write_storage::<Viewshed>();
@@ -200,6 +203,7 @@ impl GameState for State {
                 crate::gui::ItemMenuResult::Selected(e) => {
                     let mut intent = self.ecs.write_storage::<WantsToUseItem>();
                     let effect = self.ecs.read_storage::<Effect>();
+                    let levelups = self.ecs.read_storage::<LevelUp>();
                     let mut new_state = RunState::PlayerTurn;
                     match effect.get(e) {
                         Some(effect) => match effect {
@@ -234,15 +238,19 @@ impl GameState for State {
                             }
                         },
                         None => {
-                            intent
-                                .insert(
-                                    self.ecs.fetch::<Player>().entity,
-                                    WantsToUseItem {
-                                        item: e,
-                                        target: Target::Itself,
-                                    },
-                                )
-                                .expect("Unable to insert intent");
+                            if let Some(levelup) = levelups.get(e) {
+                                new_state = RunState::LevelUpMenu(levelup.amount)
+                            } else {
+                                intent
+                                    .insert(
+                                        self.ecs.fetch::<Player>().entity,
+                                        WantsToUseItem {
+                                            item: e,
+                                            target: Target::Itself,
+                                        },
+                                    )
+                                    .expect("Unable to insert intent");
+                            }
                         }
                     };
 
@@ -309,6 +317,23 @@ impl GameState for State {
                     RunState::RevealMap(y)
                 }
             }
+            RunState::LevelUpMenu(amount) => match show_levelup(ctx) {
+                crate::gui::LevelUpMenuResult::Cancel => RunState::AwaitingInput,
+                crate::gui::LevelUpMenuResult::NoResponse => RunState::LevelUpMenu(amount),
+                crate::gui::LevelUpMenuResult::Selected(stat) => {
+                    let mut stats = self.ecs.write_storage::<Stats>();
+                    let player = self.ecs.read_resource::<Player>();
+                    let player_stats = stats.get_mut(player.entity).expect("Player to have stats");
+                    match stat {
+                        "ATK" => player_stats.base_power += amount,
+                        "DEF" => player_stats.base_defense += amount,
+                        "CMP" => player_stats.base_compute += amount,
+                        "HLT" => player_stats.base_hp += amount,
+                        _ => unreachable!(),
+                    };
+                    RunState::AwaitingInput
+                }
+            },
         };
         {
             let mut runwriter = self.ecs.write_resource::<RunState>();

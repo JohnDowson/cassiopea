@@ -102,7 +102,9 @@ pub fn draw_ui(ecs: &World, ctx: &mut Rltk) {
         }
 
         ctx.print(13, 44, format!("ATK:{}", stats.base_power));
-        ctx.print(13, 45, format!("DEF:{}", stats.defense));
+        ctx.print(13, 45, format!("DEF:{}", stats.base_defense));
+        ctx.print(13, 46, format!("CMP:{}", stats.base_compute));
+        ctx.print(13, 46, format!("HLT:{}", stats.base_hp));
 
         const MAX_BARS: i32 = 5;
         let health = format!("{}/{}", stats.hp, stats.base_hp);
@@ -270,31 +272,14 @@ pub enum ItemMenuResult {
     Selected(Entity),
 }
 
-pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
-    let player = ecs.fetch::<Player>();
-    let names = ecs.read_storage::<Name>();
-    let inventory = ecs.write_storage::<InInventory>();
-    let consumables = ecs.read_storage::<Consumable>();
-    let equippables = ecs.read_storage::<Equippable>();
-
-    let inventory = (&inventory, &names)
-        .par_join()
-        .filter_map(|(inv, name)| {
-            if inv.owner == player.entity {
-                Some((inv.item, name.name.clone()))
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    let count = inventory.len();
-
-    let mut y = (25 - (count / 2)) as i32;
+fn popup_menu<'a>(ctx: &mut Rltk, entries: impl Iterator<Item = &'a str> + Clone) {
+    let count = entries.clone().count() as i32;
+    let mut y = 25 - (count / 2);
     ctx.draw_box(
         15,
         y - 2,
         31,
-        (count + 3) as i32,
+        count + 3,
         RGB::named(rltk::WHITE),
         RGB::named(rltk::BLACK),
     );
@@ -307,13 +292,12 @@ pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
     );
     ctx.print_color(
         18,
-        y + count as i32 + 1,
+        y + count + 1,
         RGB::named(rltk::YELLOW),
         RGB::named(rltk::BLACK),
         "ESCAPE to cancel",
     );
-
-    for (j, (_, name)) in inventory.iter().enumerate() {
+    for (j, name) in entries.enumerate() {
         ctx.set(
             17,
             y,
@@ -339,6 +323,28 @@ pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
         ctx.print(21, y, name);
         y += 1;
     }
+}
+
+pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
+    let player = ecs.fetch::<Player>();
+    let names = ecs.read_storage::<Name>();
+    let inventory = ecs.write_storage::<InInventory>();
+    let consumables = ecs.read_storage::<Consumable>();
+    let equippables = ecs.read_storage::<Equippable>();
+
+    let inventory = (&inventory, &names)
+        .par_join()
+        .filter_map(|(inv, name)| {
+            if inv.owner == player.entity {
+                Some((inv.item, &*name.name))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    let count = inventory.len() as i32;
+
+    popup_menu(ctx, inventory.iter().map(|&(_, n)| -> &str { n }));
 
     match ctx.key {
         None => ItemMenuResult::NoResponse,
@@ -346,7 +352,7 @@ pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
             VirtualKeyCode::Escape => ItemMenuResult::Cancel,
             _ => {
                 let selection = rltk::letter_to_option(key);
-                if selection > -1 && selection < count as i32 {
+                if selection > -1 && selection < count {
                     let entity = inventory[selection as usize].0;
                     if consumables.get(entity).is_some() || equippables.get(entity).is_some() {
                         ItemMenuResult::Selected(entity)
@@ -355,6 +361,35 @@ pub fn show_inventory(ecs: &mut World, ctx: &mut Rltk) -> ItemMenuResult {
                     }
                 } else {
                     ItemMenuResult::NoResponse
+                }
+            }
+        },
+    }
+}
+
+pub enum LevelUpMenuResult {
+    Cancel,
+    NoResponse,
+    Selected(&'static str),
+}
+
+pub fn show_levelup(ctx: &mut Rltk) -> LevelUpMenuResult {
+    const STATS: [&str; 4] = ["DEF", "ATK", "CMP", "HLT"];
+    let count = STATS.len() as i32;
+
+    popup_menu(ctx, STATS.into_iter());
+
+    match ctx.key {
+        None => LevelUpMenuResult::NoResponse,
+        Some(key) => match key {
+            VirtualKeyCode::Escape => LevelUpMenuResult::Cancel,
+            _ => {
+                let selection = rltk::letter_to_option(key);
+                if selection > -1 && selection < count {
+                    let stat = STATS[selection as usize];
+                    LevelUpMenuResult::Selected(stat)
+                } else {
+                    LevelUpMenuResult::NoResponse
                 }
             }
         },
