@@ -14,6 +14,7 @@ use crate::{
         inventory_system::{ItemCollectionSystem, ItemConsumptionSystem},
         map_system::MapSystem,
         melee_combat::{DamageSystem, MeleeCombatSystem},
+        particle::{self, ParticleSpawnSystem},
         visability::VisibilitySystem,
     },
 };
@@ -60,6 +61,9 @@ impl State {
         item_collection.run_now(&self.ecs);
         let mut item_consumption = ItemConsumptionSystem;
         item_consumption.run_now(&self.ecs);
+        let mut particles = ParticleSpawnSystem;
+        particles.run_now(&self.ecs);
+
         self.ecs.maintain();
     }
 
@@ -144,7 +148,7 @@ impl State {
                 } else {
                     false
                 };
-                e != player.entity || in_player_inventory
+                !(e == player.entity || in_player_inventory)
             })
             .collect::<Vec<_>>()
     }
@@ -186,12 +190,14 @@ impl GameState for State {
             RunState::MainMenu(_) => {}
             _ => {
                 camera::render(&self.ecs, ctx);
+                particle::particle_lifecycle(&mut self.ecs, ctx);
                 draw_ui(&self.ecs, ctx);
             }
         }
         new_run_state = match new_run_state {
             RunState::PreRun => {
                 self.run_systems();
+                eprintln! {"Loaded and ran systems"}
                 RunState::AwaitingInput
             }
             RunState::AwaitingInput => player_input(&mut self.ecs, ctx),
@@ -307,6 +313,7 @@ impl GameState for State {
                     MainMenuSelection::SaveGame => RunState::SaveGame,
                     MainMenuSelection::LoadGame => {
                         load_game(&mut self.ecs);
+                        eprintln! {"Loaded"}
                         RunState::PreRun
                     }
                     MainMenuSelection::Quit => std::process::exit(0),
@@ -316,7 +323,7 @@ impl GameState for State {
                 save_game(&mut self.ecs);
                 RunState::MainMenu(MainMenuSelection::SaveGame)
             }
-            RunState::LoadGame => todo!(),
+            RunState::LoadGame => unreachable!(),
             RunState::NextLayer => {
                 self.next_layer();
                 RunState::PreRun

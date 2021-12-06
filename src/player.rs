@@ -23,22 +23,25 @@ pub fn player_input(ecs: &mut World, ctx: &mut Rltk) -> RunState {
     use VirtualKeyCode::*;
     match ctx.key {
         None => return RunState::AwaitingInput,
-        Some(key) => match key {
-            A => try_move_player(ecs, -1, 0),
-            D => try_move_player(ecs, 1, 0),
-            W => try_move_player(ecs, 0, -1),
-            S => try_move_player(ecs, 0, 1),
-            Q => try_move_player(ecs, -1, -1),
-            E => try_move_player(ecs, 1, -1),
-            Z => try_move_player(ecs, -1, 1),
-            X => try_move_player(ecs, 1, 1),
-            G => get_item(ecs),
-            R => return try_interact(ecs),
-            I => return RunState::ShowInventory,
-            Escape => return RunState::MainMenu(crate::gui::MainMenuSelection::SaveGame),
-            Space => return RunState::PlayerTurn,
-            _ => return RunState::AwaitingInput,
-        },
+        Some(key) => {
+            eprintln! {"Recieved input"};
+            match key {
+                A => try_move_player(ecs, -1, 0),
+                D => try_move_player(ecs, 1, 0),
+                W => try_move_player(ecs, 0, -1),
+                S => try_move_player(ecs, 0, 1),
+                Q => try_move_player(ecs, -1, -1),
+                E => try_move_player(ecs, 1, -1),
+                Z => try_move_player(ecs, -1, 1),
+                X => try_move_player(ecs, 1, 1),
+                G => get_item(ecs),
+                R => return try_interact(ecs),
+                I => return RunState::ShowInventory,
+                Escape => return RunState::MainMenu(crate::gui::MainMenuSelection::SaveGame),
+                Space => return RunState::PlayerTurn,
+                _ => return RunState::AwaitingInput,
+            }
+        }
     }
     RunState::NPCTurn
 }
@@ -88,13 +91,14 @@ fn get_item(ecs: &mut World) {
 fn try_move_player(ecs: &mut World, delta_x: i32, delta_y: i32) {
     let mut positions = ecs.write_storage::<Position>();
     let mut viewsheds = ecs.write_storage::<Viewshed>();
-    let mut players = ecs.write_storage::<Control>();
+    let mut controls = ecs.write_storage::<Control>();
     let mut player = ecs.write_resource::<Player>();
     let stats = ecs.read_storage::<Stats>();
     let mut melee = ecs.write_storage::<MeleeAttack>();
     let map = ecs.fetch::<Map>();
 
-    for (_, pos, vis) in (&mut players, &mut positions, &mut viewsheds).join() {
+    for (_, pos, vis) in (&mut controls, &mut positions, &mut viewsheds).join() {
+        eprintln! {"Trying to move player"}
         let x = min(map.dim_x - 1, max(0, pos.x + delta_x));
         let y = min(map.dim_y - 1, max(0, pos.y + delta_y));
         for maybe_target in map.tile_content[map.coords_to_idx(x, y)].iter() {

@@ -1,8 +1,10 @@
 use crate::{
-    components::{EquipBonus, Equipped, MeleeAttack, Name, Stats, TakeDamage},
+    components::{EquipBonus, Equipped, MeleeAttack, Name, Position, Stats, TakeDamage},
     gui::GameLog,
 };
 use specs::{prelude::*, rayon::iter::Either};
+
+use super::particle;
 
 pub struct MeleeCombatSystem;
 
@@ -17,11 +19,24 @@ impl<'a> System<'a> for MeleeCombatSystem {
         WriteExpect<'a, GameLog>,
         ReadStorage<'a, EquipBonus>,
         ReadStorage<'a, Equipped>,
+        WriteExpect<'a, particle::RequestQueue>,
+        ReadStorage<'a, Position>,
     );
 
     fn run(
         &mut self,
-        (entities, mut melee, names, stats, mut damage, mut log, bonus, equipped): Self::SystemData,
+        (
+            entities,
+            mut melee,
+            names,
+            stats,
+            mut damage,
+            mut log,
+            bonus,
+            equipped,
+            mut particle_request,
+            positions,
+        ): Self::SystemData,
     ) {
         for (attacker, melee, name, stat) in (&entities, &melee, &names, &stats).join() {
             if stat.hp > 0 {
@@ -61,6 +76,17 @@ impl<'a> System<'a> for MeleeCombatSystem {
                             &name.name, &target_name.name
                         ));
                     } else {
+                        let pos = positions.get(melee.target);
+                        if let Some(pos) = pos {
+                            particle_request.request(
+                                pos.x,
+                                pos.y,
+                                rltk::RGB::named(rltk::ORANGE),
+                                rltk::RGB::named(rltk::BLACK),
+                                rltk::to_cp437('‼'),
+                                200.0,
+                            );
+                        };
                         log.entry(format!(
                             "{} hits {}, for {} hp.",
                             &name.name, &target_name.name, dmg_amount

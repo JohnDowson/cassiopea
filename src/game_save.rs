@@ -28,6 +28,7 @@ macro_rules! serialize_individually {
 macro_rules! deserialize_individually {
     ($ecs:expr, $de:expr, $data:expr, $( $type:ty),*) => {
         $(
+        eprintln! {"Deserializing {}", std::any::type_name::<$type>()};
         DeserializeComponents::<NoError, _>::deserialize(
             &mut ( &mut $ecs.write_storage::<$type>(), ),
             &$data.0, // entities
@@ -72,9 +73,16 @@ pub fn save_game(ecs: &mut World) {
             MeleeAttack,
             Item,
             Consumable,
+            Equippable,
+            Slots,
+            Equipped,
             InInventory,
+            HasInventory,
             WantsToPickUp,
             WantsToUseItem,
+            Effect,
+            EquipBonus,
+            LevelUp,
             SerializationHelper
         );
     }
@@ -110,9 +118,16 @@ pub fn load_game(ecs: &mut World) {
             MeleeAttack,
             Item,
             Consumable,
+            Equippable,
+            Slots,
+            Equipped,
             InInventory,
+            HasInventory,
             WantsToPickUp,
             WantsToUseItem,
+            Effect,
+            EquipBonus,
+            LevelUp,
             SerializationHelper
         );
     }
@@ -121,19 +136,23 @@ pub fn load_game(ecs: &mut World) {
     {
         let entities = ecs.entities();
         let helper = ecs.read_storage::<SerializationHelper>();
-        let player = ecs.read_storage::<Control>();
+        let control = ecs.read_storage::<Control>();
         let position = ecs.read_storage::<Position>();
         for (e, h) in (&entities, &helper).join() {
             let mut worldmap = ecs.write_resource::<Map>();
             *worldmap = h.map.clone();
             worldmap.tile_content = vec![Vec::new(); h.map.size()];
-            worldmap.visible = vec![true; h.map.size()];
-            worldmap.revealed = vec![true; h.map.size()];
-            worldmap.passable = vec![true; h.map.size()];
+            worldmap.visible = vec![false; h.map.size()];
+            worldmap.passable = vec![false; h.map.size()];
             worldmap.populate_passable();
             deleteme = Some(e);
         }
-        for (e, _p, pos) in (&entities, &player, &position).join() {
+        let mut vis = ecs.write_storage::<Viewshed>();
+        for vis in (&mut vis).join() {
+            vis.dirty = true;
+        }
+
+        for (e, _p, pos) in (&entities, &control, &position).join() {
             let mut player_resource = ecs.write_resource::<Player>();
             *player_resource = Player {
                 entity: e,

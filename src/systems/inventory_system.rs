@@ -2,6 +2,8 @@ use crate::{components::*, gui::GameLog, map::Map, player::Player};
 use rltk::Point;
 use specs::prelude::*;
 
+use super::particle;
+
 pub struct ItemCollectionSystem;
 
 impl<'a> System<'a> for ItemCollectionSystem {
@@ -72,6 +74,8 @@ impl<'a> System<'a> for ItemConsumptionSystem {
         WriteStorage<'a, Equipped>,
         ReadStorage<'a, Slots>,
         WriteStorage<'a, InInventory>,
+        WriteExpect<'a, particle::RequestQueue>,
+        ReadStorage<'a, Position>,
     );
 
     fn run(
@@ -91,6 +95,8 @@ impl<'a> System<'a> for ItemConsumptionSystem {
             mut equippeds,
             slots,
             mut in_invenory,
+            mut particle_request,
+            positions,
         ): Self::SystemData,
     ) {
         for (entity, wants, stats) in (&entities, &wants_use, &mut combat_stats).join() {
@@ -98,6 +104,17 @@ impl<'a> System<'a> for ItemConsumptionSystem {
             if let Some(effect) = effect {
                 match effect {
                     Effect::HealSelf(amount) => {
+                        let pos = positions.get(entity);
+                        if let Some(pos) = pos {
+                            particle_request.request(
+                                pos.x,
+                                pos.y,
+                                rltk::RGB::named(rltk::GREEN),
+                                rltk::RGB::named(rltk::BLACK),
+                                rltk::to_cp437('♥'),
+                                200.0,
+                            );
+                        }
                         stats.hp = i32::min(stats.base_hp, stats.hp + amount);
                         if entity == player.entity {
                             gamelog.entry(format!(
@@ -115,6 +132,17 @@ impl<'a> System<'a> for ItemConsumptionSystem {
                             let idx = map.coords_to_idx(x, y);
                             for mob in &map.tile_content[idx] {
                                 if !items.contains(*mob) {
+                                    let pos = positions.get(*mob);
+                                    if let Some(pos) = pos {
+                                        particle_request.request(
+                                            pos.x,
+                                            pos.y,
+                                            rltk::RGB::named(rltk::RED),
+                                            rltk::RGB::named(rltk::BLACK),
+                                            rltk::to_cp437('‼'),
+                                            200.0,
+                                        );
+                                    }
                                     TakeDamage::new_damage(&mut take_damage, *mob, *damage);
                                     if entity == player.entity {
                                         gamelog.entry(format!(
@@ -142,8 +170,17 @@ impl<'a> System<'a> for ItemConsumptionSystem {
                             blast_tiles.retain(|p| {
                                 p.x > 0 && p.x < map.dim_x - 1 && p.y > 0 && p.y < map.dim_y - 1
                             });
-                            for tile_idx in blast_tiles.into_iter() {
-                                let idx = map.coords_to_idx(tile_idx.x, tile_idx.y);
+                            for title_coords in blast_tiles.into_iter() {
+                                particle_request.request(
+                                    title_coords.x,
+                                    title_coords.y,
+                                    rltk::RGB::named(rltk::RED),
+                                    rltk::RGB::named(rltk::BLACK),
+                                    rltk::to_cp437('░'),
+                                    200.0,
+                                );
+
+                                let idx = map.coords_to_idx(title_coords.x, title_coords.y);
                                 for mob in &map.tile_content[idx] {
                                     TakeDamage::new_damage(&mut take_damage, *mob, *damage);
                                     if entity == player.entity {
@@ -160,6 +197,17 @@ impl<'a> System<'a> for ItemConsumptionSystem {
                         }
                     },
                     Effect::Recharge(amount) => {
+                        let pos = positions.get(entity);
+                        if let Some(pos) = pos {
+                            particle_request.request(
+                                pos.x,
+                                pos.y,
+                                rltk::RGB::named(rltk::GREEN),
+                                rltk::RGB::named(rltk::BLACK),
+                                rltk::to_cp437('♦'),
+                                200.0,
+                            );
+                        }
                         stats.hp = i32::min(stats.base_compute, stats.compute + amount);
                         if entity == player.entity {
                             gamelog.entry(format!(

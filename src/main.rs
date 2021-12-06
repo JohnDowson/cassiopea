@@ -3,6 +3,7 @@ use cassiopea::{
     gui::{GameLog, MainMenuSelection},
     spawner::player,
     state::{RunState, State},
+    systems::particle,
 };
 use specs::prelude::*;
 use specs::saveload::{SimpleMarker, SimpleMarkerAllocator};
@@ -41,6 +42,7 @@ fn main() -> rltk::BError {
     gs.ecs.register::<WantsToPickUp>();
     gs.ecs.register::<WantsToUseItem>();
     gs.ecs.register::<LevelUp>();
+    gs.ecs.register::<Particle>();
 
     let player = player(&mut gs.ecs);
     gs.ecs.insert(player);
@@ -51,6 +53,7 @@ fn main() -> rltk::BError {
     gs.ecs
         .insert(RunState::MainMenu(MainMenuSelection::NewGame));
     gs.ecs.insert(GameLog::default());
+    gs.ecs.insert(particle::RequestQueue::new());
 
     rltk::main_loop(context, gs)
 }

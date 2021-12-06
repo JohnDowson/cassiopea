@@ -1,5 +1,4 @@
-use std::collections::HashSet;
-
+use crate::map::Map;
 use rltk::{Point, RGB};
 use serde::{Deserialize, Serialize};
 #[allow(deprecated)]
@@ -8,10 +7,8 @@ use specs::{
     prelude::*,
     saveload::{ConvertSaveload, Marker},
 };
-
 use specs_derive::{Component, ConvertSaveload};
-
-use crate::map::Map;
+use std::collections::HashSet;
 
 #[derive(Component, Debug, Clone, Copy, ConvertSaveload)]
 pub struct Position {
@@ -102,9 +99,7 @@ pub struct Equippable {
     pub slot: Slot,
 }
 
-#[derive(
-    PartialEq, Eq, PartialOrd, Ord, Hash, Component, Debug, Serialize, Deserialize, Clone, Copy,
-)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum Slot {
     Head,
     Hands,
@@ -182,4 +177,9 @@ pub struct SerializationHelper {
 #[derive(Component, Debug, Serialize, Deserialize, Clone)]
 pub struct LevelUp {
     pub amount: i32,
+}
+
+#[derive(Component, Debug, Serialize, Deserialize, Clone)]
+pub struct Particle {
+    pub lifetime: f32,
 }
