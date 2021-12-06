@@ -4,7 +4,7 @@ use crate::{
     player::Player,
     state::RunState,
 };
-use specs::prelude::*;
+use specs::{prelude::*, rayon::iter::IntoParallelIterator};
 
 pub struct EnemyAI;
 
@@ -48,12 +48,24 @@ impl<'a> System<'a> for EnemyAI {
                     return Some(ent);
                 }
                 if viewshed.visible_tiles.contains(&player.position.as_point()) {
-                    let path = rltk::a_star_search(
-                        map.coords_to_idx(pos.x, pos.y),
-                        map.coords_to_idx(player.position.x, player.position.y),
-                        &*map,
-                    );
-                    if dbg! {path.success} && path.steps.len() > 1 {
+                    let end_positions = [
+                        map.coords_to_idx(player.position.x + 1, player.position.y),
+                        map.coords_to_idx(player.position.x - 1, player.position.y),
+                        map.coords_to_idx(player.position.x, player.position.y + 1),
+                        map.coords_to_idx(player.position.x, player.position.y - 1),
+                        map.coords_to_idx(player.position.x + 1, player.position.y + 1),
+                        map.coords_to_idx(player.position.x - 1, player.position.y + 1),
+                        map.coords_to_idx(player.position.x + 1, player.position.y - 1),
+                        map.coords_to_idx(player.position.x - 1, player.position.y - 1),
+                    ];
+                    let path = end_positions
+                        .into_par_iter()
+                        .map(|end_pos| {
+                            rltk::a_star_search(map.coords_to_idx(pos.x, pos.y), end_pos, &*map)
+                        })
+                        .find_any(|path| path.success && path.steps.len() > 1);
+
+                    if let Some(path) = path {
                         pos.x = path.steps[1] as i32 % map.dim_x;
                         pos.y = path.steps[1] as i32 / map.dim_x;
                         map.passable[path.steps[1]] = false;
