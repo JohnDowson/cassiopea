@@ -133,7 +133,7 @@ pub fn load_game(ecs: &mut World) {
             let mut player_resource = ecs.write_resource::<Player>();
             *player_resource = Player {
                 entity: e,
-                position: pos.as_point(),
+                position: *pos,
             };
         }
     }

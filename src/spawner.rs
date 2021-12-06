@@ -1,19 +1,19 @@
 use std::collections::HashSet;
 
 use crate::{components::*, map::Map, player::Player, random};
-use rltk::{Point, RandomNumberGenerator, RGB};
+use rltk::{RandomNumberGenerator, RGB};
 use specs::{
     prelude::*,
     saveload::{MarkedBuilder, SimpleMarker},
 };
 
-pub fn player(ecs: &mut World, x: i32, y: i32) -> Player {
+pub fn player(ecs: &mut World, position: Position) -> Player {
     let mut slots = HashSet::new();
     slots.insert(Slot::Body);
     slots.insert(Slot::Hands);
     let entity = ecs
         .create_entity()
-        .with(Position { x, y })
+        .with(position)
         .with(Renderable {
             glyph: rltk::to_cp437('@'),
             fg: RGB::named(rltk::YELLOW),
@@ -42,7 +42,6 @@ pub fn player(ecs: &mut World, x: i32, y: i32) -> Player {
         .with(Slots { slots })
         .marked::<SimpleMarker<SerializeMe>>()
         .build();
-    let position = Point::new(x, y);
     Player { entity, position }
 }
 
@@ -168,7 +167,7 @@ pub fn spawn_room(ecs: &mut World) {
     }
 }
 
-fn healing_cell(ecs: &mut World, x: i32, y: i32) {
+pub fn healing_cell(ecs: &mut World, x: i32, y: i32) {
     ecs.create_entity()
         .with(Position { x, y })
         .with(Renderable {
@@ -187,7 +186,7 @@ fn healing_cell(ecs: &mut World, x: i32, y: i32) {
         .build();
 }
 
-fn laser_cell(ecs: &mut World, x: i32, y: i32) {
+pub fn laser_cell(ecs: &mut World, x: i32, y: i32) {
     ecs.create_entity()
         .with(Position { x, y })
         .with(Renderable {
@@ -209,7 +208,7 @@ fn laser_cell(ecs: &mut World, x: i32, y: i32) {
         .build();
 }
 
-fn compact_missile(ecs: &mut World, x: i32, y: i32) {
+pub fn compact_missile(ecs: &mut World, x: i32, y: i32) {
     ecs.create_entity()
         .with(Position { x, y })
         .with(Renderable {
@@ -232,7 +231,7 @@ fn compact_missile(ecs: &mut World, x: i32, y: i32) {
         .build();
 }
 
-fn energy_shield(ecs: &mut World, x: i32, y: i32) {
+pub fn energy_shield(ecs: &mut World, x: i32, y: i32) {
     ecs.create_entity()
         .with(Position { x, y })
         .with(Renderable {
@@ -251,7 +250,7 @@ fn energy_shield(ecs: &mut World, x: i32, y: i32) {
         .build();
 }
 
-fn vibro_blade(ecs: &mut World, x: i32, y: i32) {
+pub fn vibro_blade(ecs: &mut World, x: i32, y: i32) {
     ecs.create_entity()
         .with(Position { x, y })
         .with(Renderable {

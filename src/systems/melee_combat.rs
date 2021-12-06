@@ -53,7 +53,7 @@ impl<'a> System<'a> for MeleeCombatSystem {
                             EquipBonus::Attack(_) => defense,
                         },
                     );
-                    let dmg_amount = i32::max(0, dbg! {effective_power} - dbg! {effective_defense});
+                    let dmg_amount = i32::max(0, effective_power - effective_defense);
 
                     if dmg_amount == 0 {
                         log.entry(format!(

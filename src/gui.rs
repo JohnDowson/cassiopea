@@ -390,7 +390,7 @@ pub fn show_targeting(
     let mut available = Vec::new();
     if let Some(visible) = viewsheds.get(player.entity) {
         for p in &visible.visible_tiles {
-            let distance = rltk::DistanceAlg::Pythagoras.distance2d(player.position, *p);
+            let distance = rltk::DistanceAlg::Pythagoras.distance2d(player.position.as_point(), *p);
             if distance <= range as f32 {
                 let screen_x = p.x - min_x;
                 let screen_y = p.y - min_y;

@@ -42,18 +42,18 @@ impl<'a> System<'a> for EnemyAI {
         let want_to_melee = (&entities, &mut viewshed, &name, &enemy, &mut pos)
             .join()
             .filter_map(|(ent, viewshed, _name, _, pos)| {
-                let distance =
-                    rltk::DistanceAlg::Pythagoras.distance2d(pos.as_point(), player.position);
+                let distance = rltk::DistanceAlg::Pythagoras
+                    .distance2d(pos.as_point(), player.position.as_point());
                 if distance < 1.5 {
                     return Some(ent);
                 }
-                if viewshed.visible_tiles.contains(&player.position) {
+                if viewshed.visible_tiles.contains(&player.position.as_point()) {
                     let path = rltk::a_star_search(
                         map.coords_to_idx(pos.x, pos.y),
                         map.coords_to_idx(player.position.x, player.position.y),
                         &*map,
                     );
-                    if path.success && path.steps.len() > 1 {
+                    if dbg! {path.success} && path.steps.len() > 1 {
                         pos.x = path.steps[1] as i32 % map.dim_x;
                         pos.y = path.steps[1] as i32 / map.dim_x;
                         map.passable[path.steps[1]] = false;

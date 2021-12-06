@@ -1,17 +1,20 @@
+use rltk::{Algorithm2D, BaseMap, Point, RGB};
+use serde::{Deserialize, Serialize};
+use specs::Entity;
 use std::{
     cmp::{max, min},
     ops::{Index, IndexMut},
 };
 
-use rltk::{Algorithm2D, BaseMap, Point, RGB};
-use serde::{Deserialize, Serialize};
-use specs::Entity;
+pub mod builder;
+
 #[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub enum Tile {
     Wall,
     Floor,
     TerminalDown,
     TerminalUp,
+    TerminalService,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -237,6 +240,15 @@ impl Map {
                 },
                 RGB::named(rltk::SKY_BLUE),
                 rltk::to_cp437('▲'),
+            ),
+            Tile::TerminalService => (
+                if self.visible[idx] {
+                    RGB::from_f32(0.4, 0.4, 0.4)
+                } else {
+                    RGB::from_f32(0.2, 0.2, 0.2)
+                },
+                RGB::named(rltk::SKY_BLUE),
+                rltk::to_cp437('◙'),
             ),
         }
     }

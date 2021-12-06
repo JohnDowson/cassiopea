@@ -40,6 +40,7 @@ pub enum RunState {
     SaveGame,
     LoadGame,
     NextLayer,
+    RevealMap(i32),
 }
 
 impl State {
@@ -294,6 +295,19 @@ impl GameState for State {
             RunState::NextLayer => {
                 self.next_layer();
                 RunState::PreRun
+            }
+            RunState::RevealMap(mut y) => {
+                let mut map = self.ecs.write_resource::<Map>();
+                for x in 0..map.dim_x - 1 {
+                    let idx = map.coords_to_idx(x, y);
+                    map.revealed[idx] = true;
+                }
+                y += 1;
+                if y == map.dim_y {
+                    RunState::AwaitingInput
+                } else {
+                    RunState::RevealMap(y)
+                }
             }
         };
         {

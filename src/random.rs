@@ -2,6 +2,8 @@ use std::collections::HashSet;
 
 use rltk::RandomNumberGenerator;
 
+use crate::map::builder::{MapBuilder, SimpleMapBuilder};
+
 #[derive(Eq)]
 pub struct Entry {
     name: String,
@@ -34,12 +36,14 @@ impl Table {
     }
 
     pub fn insert<S: Into<String>>(mut self, name: S, weight: i32) -> Self {
-        let entry = Entry {
-            name: name.into(),
-            weight,
-        };
-        if self.entries.insert(entry) {
-            self.total_weight += weight;
+        if weight > 0 {
+            let entry = Entry {
+                name: name.into(),
+                weight,
+            };
+            if self.entries.insert(entry) {
+                self.total_weight += weight;
+            }
         }
         self
     }
@@ -68,4 +72,19 @@ impl Default for Table {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub fn room_table() -> Table {
+    Table::new()
+        .insert("Skel", 8)
+        .insert("Snake", 6)
+        .insert("Healing cell", 3)
+        .insert("Laser cell", 3)
+        .insert("Compact missile", 2)
+        .insert("Energy Shield", 2)
+        .insert("Vibro Blade", 2)
+}
+
+pub fn random_map_builder() -> Box<dyn MapBuilder> {
+    Box::new(SimpleMapBuilder)
 }

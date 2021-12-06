@@ -46,7 +46,7 @@ fn main() -> rltk::BError {
 
     let mut rng = rltk::RandomNumberGenerator::new();
     let (x, y) = rng.random_slice_entry(&map.rooms).unwrap().center();
-    let player = player(&mut gs.ecs, x, y);
+    let player = player(&mut gs.ecs, Position { x, y });
 
     gs.ecs.insert(player);
     gs.ecs.insert(map);

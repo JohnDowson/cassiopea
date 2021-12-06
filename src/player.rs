@@ -1,21 +1,22 @@
 use std::cmp::{max, min};
+use std::collections::HashSet;
 
 use crate::components::*;
 use crate::gui::GameLog;
 use crate::map::Tile;
 use crate::{map::Map, state::RunState};
-use rltk::{Point, Rltk, VirtualKeyCode};
+use rltk::{Rltk, VirtualKeyCode, RGB};
 use serde::{Deserialize, Serialize};
 #[allow(deprecated)]
 use specs::error::NoError;
 use specs::prelude::*;
-use specs::saveload::{ConvertSaveload, Marker};
+use specs::saveload::{ConvertSaveload, MarkedBuilder, Marker, SimpleMarker};
 use specs_derive::ConvertSaveload;
 
 #[derive(ConvertSaveload, Clone)]
 pub struct Player {
     pub entity: Entity,
-    pub position: Point,
+    pub position: Position,
 }
 
 pub fn player_input(ecs: &mut World, ctx: &mut Rltk) -> RunState {
@@ -49,6 +50,7 @@ fn try_interact(ecs: &mut World) -> RunState {
     match map[(player.position.x, player.position.y)] {
         Tile::TerminalDown => RunState::NextLayer,
         Tile::TerminalUp => todo!(),
+        Tile::TerminalService => RunState::RevealMap(0),
         _ => RunState::AwaitingInput,
     }
 }
@@ -116,4 +118,43 @@ fn try_move_player(ecs: &mut World, delta_x: i32, delta_y: i32) {
         }
         vis.dirty = true;
     }
+}
+
+pub fn player(ecs: &mut World, pos: Position) -> Player {
+    let mut slots = HashSet::new();
+    slots.insert(Slot::Body);
+    slots.insert(Slot::Hands);
+    let entity = ecs
+        .create_entity()
+        .with(pos)
+        .with(Renderable {
+            glyph: rltk::to_cp437('@'),
+            fg: RGB::named(rltk::YELLOW),
+            bg: RGB::named(rltk::BLACK),
+            render_order: 1,
+        })
+        .with(Control)
+        .with(Viewshed {
+            visible_tiles: Default::default(),
+            range: 8,
+            dirty: true,
+        })
+        .with(Blocker)
+        .with(Stats {
+            base_power: 10,
+            base_hp: 20,
+            hp: 20,
+            defense: 100,
+            compute: 10,
+            base_compute: 10,
+        })
+        .with(Name {
+            name: "Player".to_string(),
+        })
+        .with(HasInventory)
+        .with(Slots { slots })
+        .marked::<SimpleMarker<SerializeMe>>()
+        .build();
+    let position = pos;
+    Player { entity, position }
 }
