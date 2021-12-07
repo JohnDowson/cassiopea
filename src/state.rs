@@ -9,12 +9,14 @@ use crate::{
     map::Map,
     player::{player_input, Player},
     random::random_map_builder,
+    spawner,
     systems::{
         ai::EnemyAI,
         inventory_system::{ItemCollectionSystem, ItemConsumptionSystem},
         map_system::MapSystem,
         melee_combat::{DamageSystem, MeleeCombatSystem},
         particle::{self, ParticleSpawnSystem},
+        trace_timer::TraceTimerSystem,
         visability::VisibilitySystem,
     },
 };
@@ -43,6 +45,7 @@ pub enum RunState {
     NextLayer,
     RevealMap(i32),
     LevelUpMenu(i32),
+    GameOver,
 }
 
 impl State {
@@ -61,6 +64,8 @@ impl State {
         item_collection.run_now(&self.ecs);
         let mut item_consumption = ItemConsumptionSystem;
         item_consumption.run_now(&self.ecs);
+        let mut trace = TraceTimerSystem;
+        trace.run_now(&self.ecs);
         let mut particles = ParticleSpawnSystem;
         particles.run_now(&self.ecs);
 
@@ -73,12 +78,13 @@ impl State {
         {
             let stats = self.ecs.read_storage::<Stats>();
             let entities = self.ecs.entities();
-            let players = self.ecs.read_storage::<Control>();
+            let player = self.ecs.read_resource::<Player>();
             let names = self.ecs.read_storage::<Name>();
             let inventory = self.ecs.read_storage::<HasInventory>();
             let mut in_inventory = self.ecs.write_storage::<InInventory>();
             let mut position = self.ecs.write_storage::<Position>();
             let mut log = self.ecs.write_resource::<GameLog>();
+            let mut runstate = self.ecs.write_resource::<RunState>();
 
             for (ent, stat, pos) in (&entities, &stats, &position).join() {
                 if stat.hp <= 0 {
@@ -91,16 +97,15 @@ impl State {
                             }
                         }));
                     }
-                    let player = players.get(ent);
-                    match player {
-                        None => {
-                            let victim_name = names.get(ent);
-                            if let Some(victim_name) = victim_name {
-                                log.entry(format!("{} is dead", &victim_name.name));
-                            }
-                            dead.push(ent)
+                    if ent != player.entity {
+                        let victim_name = names.get(ent);
+                        if let Some(victim_name) = victim_name {
+                            log.entry(format!("{} is dead", &victim_name.name));
                         }
-                        Some(_) => log.entry("You are dead".into()),
+                        dead.push(ent)
+                    } else {
+                        log.entry("You are dead".into());
+                        *runstate = RunState::GameOver
                     }
                 }
             }
@@ -131,6 +136,14 @@ impl State {
             };
             self.generate_map(dim_x, dim_y, layer)
         }
+
+        self.ecs.exec(
+            |(p, mut t): (ReadExpect<Player>, WriteStorage<TraceTimer>)| {
+                t.get_mut(p.entity)
+                    .expect("Player has no trace component")
+                    .timer += 200
+            },
+        );
 
         let mut log = self.ecs.write_resource::<GameLog>();
         log.entry("You descend to the next network layer".into())
@@ -165,8 +178,8 @@ impl State {
             player_spawn
         };
 
-        let map = builder.get_map();
-        *self.ecs.entry::<Map>().or_insert(map) = map.clone();
+        let map_new = builder.get_map();
+        *self.ecs.entry::<Map>().or_insert(map_new) = map_new.clone();
 
         let mut player = self.ecs.fetch_mut::<Player>();
         player.position = player_spawn;
@@ -197,7 +210,6 @@ impl GameState for State {
         new_run_state = match new_run_state {
             RunState::PreRun => {
                 self.run_systems();
-                eprintln! {"Loaded and ran systems"}
                 RunState::AwaitingInput
             }
             RunState::AwaitingInput => player_input(&mut self.ecs, ctx),
@@ -313,7 +325,6 @@ impl GameState for State {
                     MainMenuSelection::SaveGame => RunState::SaveGame,
                     MainMenuSelection::LoadGame => {
                         load_game(&mut self.ecs);
-                        eprintln! {"Loaded"}
                         RunState::PreRun
                     }
                     MainMenuSelection::Quit => std::process::exit(0),
@@ -358,6 +369,19 @@ impl GameState for State {
                     RunState::AwaitingInput
                 }
             },
+            RunState::GameOver => {
+                {
+                    let player = self.ecs.fetch::<Player>().entity;
+                    self.ecs
+                        .delete_entity(player)
+                        .expect("Failed to delete dead player");
+                    let new_player = spawner::player(&mut self.ecs);
+                    let mut player = self.ecs.fetch_mut::<Player>();
+                    *player = new_player;
+                }
+                self.generate_map(128, 128, 0);
+                RunState::MainMenu(MainMenuSelection::NewGame)
+            }
         };
         {
             let mut runwriter = self.ecs.write_resource::<RunState>();

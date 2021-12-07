@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{cmp::min, collections::HashSet};
 
 use crate::{components::*, player::Player, random};
 use rltk::RGB;
@@ -6,10 +6,10 @@ use specs::{
     prelude::*,
     saveload::{MarkedBuilder, SimpleMarker},
 };
-pub fn room_table() -> random::Table {
+pub fn room_table(layer: i32) -> random::Table {
     random::Table::new()
-        .insert("Skel", 8)
-        .insert("Snake", 6)
+        .insert("Skel", min(layer, 10))
+        .insert("Snake", 10 - layer)
         .insert("Healing cell", 3)
         .insert("Laser cell", 3)
         .insert("Compact missile", 2)
@@ -40,10 +40,10 @@ pub fn player(ecs: &mut World) -> Player {
         })
         .with(Blocker)
         .with(Stats {
-            base_power: 10,
-            base_hp: 20,
-            hp: 20,
-            base_defense: 100,
+            base_power: 3,
+            base_hp: 10,
+            hp: 10,
+            base_defense: 1,
             compute: 10,
             base_compute: 10,
         })
@@ -52,6 +52,7 @@ pub fn player(ecs: &mut World) -> Player {
         })
         .with(HasInventory)
         .with(Slots { slots })
+        .with(TraceTimer { timer: 400 })
         .marked::<SimpleMarker<SerializeMe>>()
         .build();
     Player {
@@ -80,10 +81,10 @@ pub fn snake(ecs: &mut World, x: i32, y: i32) {
         })
         .with(Blocker)
         .with(Stats {
-            base_power: 5,
+            base_power: 3,
             base_hp: 5,
             hp: 5,
-            base_defense: 5,
+            base_defense: 1,
             compute: 0,
             base_compute: 0,
         })
@@ -111,10 +112,10 @@ pub fn skel(ecs: &mut World, x: i32, y: i32) {
         })
         .with(Blocker)
         .with(Stats {
-            base_power: 5,
-            base_hp: 5,
-            hp: 5,
-            base_defense: 5,
+            base_power: 8,
+            base_hp: 10,
+            hp: 10,
+            base_defense: 3,
             compute: 0,
             base_compute: 0,
         })
@@ -136,7 +137,7 @@ pub fn healing_cell(ecs: &mut World, x: i32, y: i32) {
         })
         .with(Item)
         .with(Consumable)
-        .with(Effect::HealSelf(9))
+        .with(Effect::HealSelf(10))
         .marked::<SimpleMarker<SerializeMe>>()
         .build();
 }

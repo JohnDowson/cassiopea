@@ -1,17 +1,15 @@
-use std::cmp::{max, min};
-use std::collections::HashSet;
-
 use crate::components::*;
 use crate::gui::GameLog;
 use crate::map::Tile;
 use crate::{map::Map, state::RunState};
-use rltk::{Rltk, VirtualKeyCode, RGB};
+use rltk::{Rltk, VirtualKeyCode};
 use serde::{Deserialize, Serialize};
 #[allow(deprecated)]
 use specs::error::NoError;
 use specs::prelude::*;
-use specs::saveload::{ConvertSaveload, MarkedBuilder, Marker, SimpleMarker};
+use specs::saveload::{ConvertSaveload, Marker};
 use specs_derive::ConvertSaveload;
+use std::cmp::{max, min};
 
 #[derive(ConvertSaveload, Clone)]
 pub struct Player {
@@ -23,27 +21,24 @@ pub fn player_input(ecs: &mut World, ctx: &mut Rltk) -> RunState {
     use VirtualKeyCode::*;
     match ctx.key {
         None => return RunState::AwaitingInput,
-        Some(key) => {
-            eprintln! {"Recieved input"};
-            match key {
-                A => try_move_player(ecs, -1, 0),
-                D => try_move_player(ecs, 1, 0),
-                W => try_move_player(ecs, 0, -1),
-                S => try_move_player(ecs, 0, 1),
-                Q => try_move_player(ecs, -1, -1),
-                E => try_move_player(ecs, 1, -1),
-                Z => try_move_player(ecs, -1, 1),
-                X => try_move_player(ecs, 1, 1),
-                G => get_item(ecs),
-                R => return try_interact(ecs),
-                I => return RunState::ShowInventory,
-                Escape => return RunState::MainMenu(crate::gui::MainMenuSelection::SaveGame),
-                Space => return RunState::PlayerTurn,
-                _ => return RunState::AwaitingInput,
-            }
-        }
+        Some(key) => match key {
+            A => try_move_player(ecs, -1, 0),
+            D => try_move_player(ecs, 1, 0),
+            W => try_move_player(ecs, 0, -1),
+            S => try_move_player(ecs, 0, 1),
+            Q => try_move_player(ecs, -1, -1),
+            E => try_move_player(ecs, 1, -1),
+            Z => try_move_player(ecs, -1, 1),
+            X => try_move_player(ecs, 1, 1),
+            G => get_item(ecs),
+            R => return try_interact(ecs),
+            I => return RunState::ShowInventory,
+            Escape => return RunState::MainMenu(crate::gui::MainMenuSelection::SaveGame),
+            Space => return RunState::PlayerTurn,
+            _ => return RunState::AwaitingInput,
+        },
     }
-    RunState::NPCTurn
+    RunState::PlayerTurn
 }
 
 fn try_interact(ecs: &mut World) -> RunState {
@@ -98,7 +93,6 @@ fn try_move_player(ecs: &mut World, delta_x: i32, delta_y: i32) {
     let map = ecs.fetch::<Map>();
 
     for (_, pos, vis) in (&mut controls, &mut positions, &mut viewsheds).join() {
-        eprintln! {"Trying to move player"}
         let x = min(map.dim_x - 1, max(0, pos.x + delta_x));
         let y = min(map.dim_y - 1, max(0, pos.y + delta_y));
         for maybe_target in map.tile_content[map.coords_to_idx(x, y)].iter() {
@@ -122,43 +116,4 @@ fn try_move_player(ecs: &mut World, delta_x: i32, delta_y: i32) {
         }
         vis.dirty = true;
     }
-}
-
-pub fn player(ecs: &mut World, pos: Position) -> Player {
-    let mut slots = HashSet::new();
-    slots.insert(Slot::Body);
-    slots.insert(Slot::Hands);
-    let entity = ecs
-        .create_entity()
-        .with(pos)
-        .with(Renderable {
-            glyph: rltk::to_cp437('@'),
-            fg: RGB::named(rltk::YELLOW),
-            bg: RGB::named(rltk::BLACK),
-            render_order: 1,
-        })
-        .with(Control)
-        .with(Viewshed {
-            visible_tiles: Default::default(),
-            range: 8,
-            dirty: true,
-        })
-        .with(Blocker)
-        .with(Stats {
-            base_power: 10,
-            base_hp: 20,
-            hp: 20,
-            base_defense: 100,
-            compute: 10,
-            base_compute: 10,
-        })
-        .with(Name {
-            name: "Player".to_string(),
-        })
-        .with(HasInventory)
-        .with(Slots { slots })
-        .marked::<SimpleMarker<SerializeMe>>()
-        .build();
-    let position = pos;
-    Player { entity, position }
 }

@@ -40,7 +40,7 @@ fn spawn_room(map: &Map, room: &Rect, ecs: &mut World) {
         }
     }
 
-    let spawn_table = spawner::room_table();
+    let spawn_table = spawner::room_table(map.layer);
     let spawns = {
         let mut rng = ecs.write_resource::<RandomNumberGenerator>();
         spawn_points

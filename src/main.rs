@@ -5,6 +5,7 @@ use cassiopea::{
     state::{RunState, State},
     systems::particle,
 };
+use rltk::RGBA;
 use specs::prelude::*;
 use specs::saveload::{SimpleMarker, SimpleMarkerAllocator};
 
@@ -12,6 +13,7 @@ fn main() -> rltk::BError {
     use rltk::RltkBuilder;
     let context = RltkBuilder::simple80x50()
         .with_title("Roguelike Tutorial")
+        .with_font_bg("Curses-square-24.png", 384, 384, RGBA::from_u8(0, 0, 0, 0))
         .with_fps_cap(30.0)
         .build()?;
 
@@ -43,12 +45,15 @@ fn main() -> rltk::BError {
     gs.ecs.register::<WantsToUseItem>();
     gs.ecs.register::<LevelUp>();
     gs.ecs.register::<Particle>();
+    gs.ecs.register::<TraceTimer>();
+    gs.ecs.register::<Drops>();
 
     let player = player(&mut gs.ecs);
     gs.ecs.insert(player);
-    gs.ecs.insert(rltk::RandomNumberGenerator::seeded(69));
+    let seed = rltk::RandomNumberGenerator::new().rand::<u64>();
+    gs.ecs.insert(rltk::RandomNumberGenerator::seeded(seed));
 
-    gs.generate_map(50, 50, 0);
+    gs.generate_map(128, 128, 0);
 
     gs.ecs
         .insert(RunState::MainMenu(MainMenuSelection::NewGame));

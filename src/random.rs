@@ -1,10 +1,9 @@
+use crate::map::builders::{bsp::BspBuilder, simple::SimpleMapBuilder, MapBuilder};
+use rltk::RandomNumberGenerator;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use rltk::RandomNumberGenerator;
-
-use crate::map::builders::{bsp::BspBuilder, simple::SimpleMapBuilder, MapBuilder};
-
-#[derive(Eq)]
+#[derive(Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Entry {
     name: String,
     weight: i32,
@@ -22,6 +21,7 @@ impl std::hash::Hash for Entry {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Table {
     entries: HashSet<Entry>,
     total_weight: i32,

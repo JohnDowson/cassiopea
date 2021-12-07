@@ -4,7 +4,7 @@ use crate::{
     camera,
     components::{
         Consumable, Control, Equippable, Equipped, InInventory, Name, Position, Slot, Slots, Stats,
-        Viewshed,
+        TraceTimer, Viewshed,
     },
     map::Map,
     player::Player,
@@ -73,6 +73,13 @@ pub fn draw_ui(ecs: &World, ctx: &mut Rltk) {
     }
 
     let player = ecs.fetch::<Player>();
+    let trace = ecs.read_storage::<TraceTimer>();
+    let trace = trace
+        .get(player.entity)
+        .expect("Player has no trace component");
+
+    ctx.print(70, 43, format!("TRACE:{}", trace.timer));
+
     for (_, stats) in (&player_control, &stats).join() {
         let player_items = (&equipped, &names)
             .par_join()

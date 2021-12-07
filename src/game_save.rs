@@ -28,7 +28,6 @@ macro_rules! serialize_individually {
 macro_rules! deserialize_individually {
     ($ecs:expr, $de:expr, $data:expr, $( $type:ty),*) => {
         $(
-        eprintln! {"Deserializing {}", std::any::type_name::<$type>()};
         DeserializeComponents::<NoError, _>::deserialize(
             &mut ( &mut $ecs.write_storage::<$type>(), ),
             &$data.0, // entities

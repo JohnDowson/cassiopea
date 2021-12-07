@@ -1,4 +1,4 @@
-use crate::map::Map;
+use crate::{map::Map, random};
 use rltk::{Point, RGB};
 use serde::{Deserialize, Serialize};
 #[allow(deprecated)]
@@ -182,4 +182,14 @@ pub struct LevelUp {
 #[derive(Component, Debug, Serialize, Deserialize, Clone)]
 pub struct Particle {
     pub lifetime: f32,
+}
+
+#[derive(Component, Debug, Serialize, Deserialize, Clone)]
+pub struct TraceTimer {
+    pub timer: i32,
+}
+
+#[derive(Component, Debug, Serialize, Deserialize, Clone)]
+pub struct Drops {
+    pub table: random::Table,
 }
